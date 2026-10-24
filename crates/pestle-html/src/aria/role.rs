@@ -338,9 +338,10 @@ pub(crate) struct Ctx<'d> {
 }
 
 /// The most nodes one name visits, and all names of a page together: a name from a huge subtree,
-/// or thousands of references to one, stays bounded.
+/// or thousands of references to one, stays bounded. The heaviest of 56 real pages visits 10,210
+/// nodes for all its names (the median 14); past the total, each name gets 64.
 pub(crate) const NAME_BUDGET: u32 = 20_000;
-pub(crate) const TOTAL_BUDGET: u64 = 20_000_000;
+pub(crate) const TOTAL_BUDGET: u64 = 2_000_000;
 /// How deep references nest at most.
 pub(crate) const MAX_DEPTH: u32 = 1200;
 
