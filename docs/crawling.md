@@ -1,6 +1,6 @@
 # Crawling: robots.txt and sitemaps
 
-[`examples/crawl.mjs`](../crates/bindings/pestle-node/examples/crawl.mjs) puts
+[`examples/crawl.ts`](../crates/bindings/pestle-node/examples/crawl.ts) puts
 both together: read a site's robots.txt, follow its sitemaps as they stream
 in, and list every page it lets you fetch.
 

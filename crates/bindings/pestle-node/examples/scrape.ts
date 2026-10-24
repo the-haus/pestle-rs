@@ -3,18 +3,18 @@
 // JSON, a bot wall) and its structured data (JSON-LD, microdata, RDFa,
 // microformats) as JSON-LD items. Prints a summary as JSON.
 //
-//   node scrape.mjs https://venue.example/agenda
-//   node scrape.mjs page.html [https://venue.example/agenda]   (a saved page, and the URL it came from)
+//   npx tsx scrape.ts https://venue.example/agenda
+//   npx tsx scrape.ts page.html [https://venue.example/agenda]   (a saved page, and the URL it came from)
 
 import { readFileSync } from "node:fs";
 
-import { scrape } from "@pestle-rs/node";
+import { scrape, type Scraped } from "@pestle-rs/node";
 
 const [input, base] = process.argv.slice(2);
-if (!input) throw new Error("usage: node scrape.mjs <url | file [url]>");
+if (!input) throw new Error("usage: scrape.ts <url | file [url]>");
 
 // A fetch response is read as it arrives, in the charset of its Content-Type, against its own URL.
-const { page, structured, charset } = /^https?:\/\//.test(input)
+const { page, structured, charset }: Scraped = /^https?:\/\//.test(input)
   ? await scrape(await fetch(input))
   : await scrape(readFileSync(input), { url: base });
 
@@ -24,8 +24,10 @@ if (page.blocked) {
 }
 
 // Every item of every format is JSON-LD of one shape; an untyped one is usually the page's OpenGraph (RDFa).
-const types = {};
-for (const item of structured.items) for (const t of [item["@type"] ?? "(untyped)"].flat()) types[t] = (types[t] ?? 0) + 1;
+const types: Record<string, number> = {};
+for (const item of structured.items) {
+  for (const t of [item["@type"] ?? "(untyped)"].flat()) types[t] = (types[t] ?? 0) + 1;
+}
 
 console.log(
   JSON.stringify(

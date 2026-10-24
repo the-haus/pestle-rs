@@ -3,13 +3,19 @@
 // reads in the memory of one item. Here a generated agenda of 100,000 events
 // is streamed in small chunks; the items are counted, never held.
 //
-//   node stream-items.mjs [events]
+//   npx tsx stream-items.ts [events]
 
-import { Extractor } from "@pestle-rs/node";
+import { Extractor, type Item } from "@pestle-rs/node";
+
+interface Event {
+  title: string | null;
+  url: string | null;
+  when: string | null;
+}
 
 const n = Number(process.argv[2] ?? 100_000);
 
-async function* agenda() {
+async function* agenda(): AsyncGenerator<string> {
   yield "<!doctype html><html><body><main>";
   for (let i = 0; i < n; i++) {
     yield `<article class="event"><h2><a href="/e/${i}">Night ${i}</a></h2><p class="date">${1 + (i % 28)} nov 2026</p></article>`;
@@ -27,14 +33,14 @@ const x = new Extractor({
 });
 
 let count = 0;
-let last;
+let last: Event | undefined;
 const t = performance.now();
 const { stats } = await x.stream(agenda(), {
   url: "https://venue.example/agenda",
-  onItem: ({ field, value }) => {
+  onItem: ({ field, value }: Item) => {
     if (field === "events") {
       count++;
-      last = value;
+      last = value as Event;
     }
   },
 });

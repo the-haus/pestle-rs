@@ -49,7 +49,7 @@ in its markup:
 
 Text meant for screen readers (`sr-only`) stays. This is for pages read by a
 model: hidden text is where instructions get slipped in.
-[`examples/agent-input.mjs`](../crates/bindings/pestle-node/examples/agent-input.mjs)
+[`examples/agent-input.ts`](../crates/bindings/pestle-node/examples/agent-input.ts)
 shows it on a page with two such instructions.
 
 ## Fidelity

@@ -1,7 +1,8 @@
 /**
  * The examples in examples/, run as a user runs them (`@pestle-rs/node`
  * resolving to this package), against a local site: an agenda page, a
- * robots.txt and a gzipped sitemap index.
+ * robots.txt and a gzipped sitemap index. TypeScript examples run through tsx,
+ * as `npx tsx examples/scrape.ts` runs them.
  */
 import { spawn } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync } from "node:fs";
@@ -9,11 +10,13 @@ import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import { gzipSync } from "node:zlib";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 const root = resolve(__dirname, "..");
+const tsx = pathToFileURL(require.resolve("tsx")).href;
 const agenda = readFileSync(join(root, "examples", "agenda.html"));
 let work: string;
 let server: Server;
@@ -22,7 +25,8 @@ let site: string;
 /** Run an example; resolves with its output, rejects when it fails. */
 function run(example: string, args: string[]): Promise<{ stdout: string; stderr: string }> {
   return new Promise((done, fail) => {
-    const child = spawn(process.execPath, [join(work, "examples", example), ...args], { cwd: work });
+    const loader = example.endsWith(".ts") ? ["--import", tsx] : [];
+    const child = spawn(process.execPath, [...loader, join(work, "examples", example), ...args], { cwd: work });
     let stdout = "";
     let stderr = "";
     child.stdout.on("data", (d) => (stdout += d));
@@ -69,8 +73,8 @@ afterAll(() => {
 });
 
 describe("examples", () => {
-  it("scrape.mjs, from a URL", async () => {
-    const out = JSON.parse((await run("scrape.mjs", [`${site}/agenda`])).stdout);
+  it("scrape.ts, from a URL", async () => {
+    const out = JSON.parse((await run("scrape.ts", [`${site}/agenda`])).stdout);
     expect(out).toMatchObject({
       title: "Agenda · Paradiso",
       lang: "nl",
@@ -82,9 +86,9 @@ describe("examples", () => {
     expect(out.events.map((e: { name: string }) => e.name)).toEqual(["Nora & Co", "Mira"]);
   });
 
-  it("extract.mjs, from a file and from a URL", async () => {
+  it("extract.ts, from a file and from a URL", async () => {
     const fromFile = JSON.parse(
-      (await run("extract.mjs", ["examples/agenda.spec.json", "examples/agenda.html", "https://venue.example/agenda"])).stdout,
+      (await run("extract.ts", ["examples/agenda.spec.json", "examples/agenda.html", "https://venue.example/agenda"])).stdout,
     );
     expect(fromFile.events).toEqual([
       {
@@ -108,12 +112,12 @@ describe("examples", () => {
         soldOut: true,
       },
     ]);
-    const fromUrl = JSON.parse((await run("extract.mjs", ["examples/agenda.spec.json", `${site}/agenda`])).stdout);
+    const fromUrl = JSON.parse((await run("extract.ts", ["examples/agenda.spec.json", `${site}/agenda`])).stdout);
     expect(fromUrl.events[0].url).toBe(`${site}/e/nora`);
   });
 
-  it("agent-input.mjs leaves out hidden instructions", async () => {
-    const { stdout } = await run("agent-input.mjs", ["examples/agenda.html"]);
+  it("agent-input.ts leaves out hidden instructions", async () => {
+    const { stdout } = await run("agent-input.ts", ["examples/agenda.html"]);
     expect(stdout).toContain('- button "Zoek" [ref=');
     expect(stdout).toContain('- link "Tickets" [ref=');
     expect(stdout).not.toContain("Ignore all previous instructions");
@@ -121,19 +125,29 @@ describe("examples", () => {
     expect(stdout).toMatch(/e\d+: body > main:nth-child\(2\) > form:nth-child\(2\) > button:nth-child\(2\)/);
   });
 
-  it("stream-items.mjs", async () => {
-    const out = JSON.parse((await run("stream-items.mjs", ["5000"])).stdout);
+  it("stream-items.ts", async () => {
+    const out = JSON.parse((await run("stream-items.ts", ["5000"])).stdout);
     expect(out.events).toBe(5000);
     expect(out.last).toEqual({ title: "Night 4999", url: "https://venue.example/e/4999", when: "16 nov 2026" });
   });
 
-  it("crawl.mjs follows robots.txt and a gzipped sitemap index", async () => {
-    const { stdout, stderr } = await run("crawl.mjs", [site, "mybot"]);
+  it("crawl.ts follows robots.txt and a gzipped sitemap index", async () => {
+    const { stdout, stderr } = await run("crawl.ts", [site, "mybot"]);
     expect(stdout.trim().split("\n").map((l) => JSON.parse(l))).toEqual([
       { url: `${site}/agenda`, lastmod: "2026-10-01" },
       { url: `${site}/e/nora`, lastmod: null },
     ]);
     expect(stderr).toContain("crawl-delay: 2s");
+  });
+
+  it("typed-spec.ts", async () => {
+    expect(JSON.parse((await run("typed-spec.ts", [])).stdout)).toEqual({
+      page: "Agenda",
+      events: 2,
+      onSale: ["Nora & Co"],
+      cheapest: { title: "Nora & Co", price: 25, url: "https://venue.example/e/nora" },
+      acts: ["Nora", "Kofi", "Ada", "Mira"],
+    });
   });
 
   it("commonjs.cjs", async () => {

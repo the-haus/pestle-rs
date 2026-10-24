@@ -25,6 +25,12 @@ let out = x.extract(html, Some("https://venue.example/e/1"));
 assert_eq!(out.data, json!({ "title": "Night", "acts": ["A", "B"], "tickets": "https://venue.example/t/1" }));
 ```
 
+[`examples/quickstart.rs`](examples/quickstart.rs) goes further: a streamed
+document with emitted items, the page, structured data and aria snapshot in
+one pass, robots.txt and a sitemap (`cargo run -p pestle-html --example quickstart`).
+Output values are pestle's compact `Value`; `to_json()` turns one into a
+`serde_json::Value`.
+
 ## What's in it
 
 | | |

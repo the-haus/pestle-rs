@@ -109,8 +109,17 @@ robots.allows(url);
 ```
 
 The [Node.js guide](crates/bindings/pestle-node/README.md) covers every
-function, option and recipe, and
-[`examples/`](crates/bindings/pestle-node/examples) holds runnable scripts.
+function and option, with a [cookbook](crates/bindings/pestle-node/README.md#cookbook)
+(HTTP clients, concurrency, pagination, Next.js data, Playwright, specs
+written by a model, testing) and
+[runnable TypeScript examples](crates/bindings/pestle-node/examples):
+
+```sh
+npm install @pestle-rs/node
+cd node_modules/@pestle-rs/node/examples
+npx tsx scrape.ts https://example.com
+npx tsx agent-input.ts agenda.html
+```
 
 ### Rust
 
@@ -125,11 +134,14 @@ let spec = json!({
 });
 let x = Extractor::new(&spec, &Default::default(), ExtractorOptions::default())?;
 let out = x.extract(html_bytes, Some("https://venue.example/e/1"));
-// out.data == { "title": "Night", "acts": ["A", "B"], "tickets": "https://venue.example/t/1" }
+let data = out.data.to_json(); // a serde_json::Value
+// { "title": "Night", "acts": ["A", "B"], "tickets": "https://venue.example/t/1" }
 ```
 
 `Extractor::session` streams chunk by chunk; `ExtractorOptions` switches on
-the page pass, structured data, the aria snapshot, skeleton and strip. See
+the page pass, structured data, the aria snapshot, skeleton and strip.
+[`examples/quickstart.rs`](crates/pestle-html/examples/quickstart.rs) runs
+all of it (`cargo run -p pestle-html --example quickstart`); see also
 [`crates/pestle-html`](crates/pestle-html/README.md).
 
 ## What it reads

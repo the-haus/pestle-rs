@@ -98,7 +98,7 @@
     "build:grammar": "yarn run build:native:grammar && yarn run build:ts",
     "build:ts": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.json && tsc -p tsconfig.esm.json && node scripts/copy-native.mjs",
     "build": "yarn run build:native && yarn run build:ts",
-    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json --noEmit && tsc -p tsconfig.examples.json",
     "test": "vitest run",
     "test:watch": "vitest",
     "bench": "node --expose-gc --import tsx bench/bench.mts",

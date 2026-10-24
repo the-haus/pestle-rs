@@ -5,9 +5,9 @@
 The first release of `@pestle-rs/node` on npm: prebuilt for Linux (glibc and musl), macOS and Windows, x64 and
 arm64, Node.js 18+, ESM and CommonJS, types included.
 
-- Packaging: runnable examples shipped in the package (`examples/`: scrape, extract with a spec, streamed items, agent
-  input, crawling, CommonJS), each run by the tests against a local site; a Node.js guide as the package README;
-  docs in `docs/`; CI on three OSes and Node 20/22/24, the W3C and microformats conformance suites at pinned commits,
+- Packaging: runnable TypeScript examples shipped in the package (`examples/`: scrape, extract with a spec, a typed
+  spec, streamed items, agent input, crawling; and CommonJS), each run by the tests against a local site; a Node.js guide as the package README;
+  a cookbook of recipes checked by `test/cookbook.test.ts`; docs in `docs/`; CI on three OSes and Node 20/22/24, the W3C and microformats conformance suites at pinned commits,
   and a release pipeline that tests every platform binary where it was built and installs the packed tarballs on
   every platform before publishing (with npm provenance).
 - Fixed: `parseRobots`, `parseSitemap`, `readSitemap` and `readSitemapAsync` threw when the package was loaded with

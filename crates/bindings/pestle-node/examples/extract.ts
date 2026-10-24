@@ -2,20 +2,20 @@
 // read as text, an attribute or markup (then as a URL, a number or JSON).
 // The spec is a JSON file (see agenda.spec.json); prints the data as JSON.
 //
-//   node extract.mjs agenda.spec.json https://venue.example/agenda
-//   node extract.mjs agenda.spec.json page.html [https://venue.example/agenda]
+//   npx tsx extract.ts agenda.spec.json https://venue.example/agenda
+//   npx tsx extract.ts agenda.spec.json page.html [https://venue.example/agenda]
 
 import { readFileSync } from "node:fs";
 
-import { Extractor, SpecError } from "@pestle-rs/node";
+import { Extractor, SpecError, type Spec } from "@pestle-rs/node";
 
 const [specFile, input, base] = process.argv.slice(2);
-if (!specFile || !input) throw new Error("usage: node extract.mjs <spec.json> <url | file [url]>");
+if (!specFile || !input) throw new Error("usage: extract.ts <spec.json> <url | file [url]>");
 
-let extractor;
+let extractor: Extractor;
 try {
   // Compile once; an Extractor is safe to share between any number of pages at once.
-  extractor = new Extractor(JSON.parse(readFileSync(specFile, "utf8")));
+  extractor = new Extractor(JSON.parse(readFileSync(specFile, "utf8")) as Spec);
 } catch (e) {
   if (e instanceof SpecError) {
     console.error(`the spec does not compile:\n  ${e.errors.join("\n  ")}`);
