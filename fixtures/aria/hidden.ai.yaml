@@ -1,0 +1,13 @@
+- generic [active] [ref=e1]:
+  - generic [aria-hidden] [ref=e2]:
+    - text: ariaHidden
+    - link [ref=e3] [cursor=pointer]:
+      - /url: /x
+      - text: x
+  - generic [ref=e4]: offscreen
+  - text: fontzeroopacity butVisible
+  - generic [ref=e5]: shown hidden
+  - paragraph [ref=e6]: classHidden
+  - paragraph: untilFound
+  - generic [ref=e7]: notHidden
+  - paragraph [ref=e8]: Visible

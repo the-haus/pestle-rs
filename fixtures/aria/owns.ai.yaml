@@ -1,0 +1,10 @@
+- generic [active] [ref=e1]:
+  - listbox "L" [ref=e2]:
+    - option "One" [ref=e3]
+    - option "Two" [selected] [ref=e4]
+  - button "Hello World" [ref=e5]: Hello
+  - text: World
+  - textbox "Hidden label" [ref=e6]
+  - combobox "CB" [ref=e7]:
+    - listbox [ref=e8]:
+      - option "Picked" [selected] [ref=e9]

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" width="96" height="96" role="img" aria-label="pestle">
+  <rect width="96" height="96" rx="22" fill="#1f6f5c"/>
+  <!-- the pestle -->
+  <rect x="50" y="10" width="12" height="44" rx="6" transform="rotate(28 56 32)" fill="#f2e8d5"/>
+  <!-- the mortar -->
+  <path d="M18 46h60c0 17-13 30-30 30S18 63 18 46z" fill="#f2e8d5"/>
+  <rect x="34" y="76" width="28" height="7" rx="3.5" fill="#f2e8d5"/>
+  <!-- markup inside -->
+  <path d="M36 56l-5 4 5 4M60 56l5 4-5 4M51 54l-6 12" fill="none" stroke="#1f6f5c" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

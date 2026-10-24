@@ -1,0 +1,44 @@
+- generic [active] [ref=e1]:
+  - form "Search form" [ref=e2]:
+    - text: Search
+    - searchbox "Search" [ref=e3]
+    - generic [ref=e4]:
+      - text: Email
+      - textbox "Email" [ref=e5]: a@b.nl
+    - textbox "Only placeholder" [ref=e6]
+    - textbox "T" [ref=e7]:
+      - /placeholder: P
+    - checkbox "Agree" [checked] [ref=e8]
+    - text: Agree
+    - radio "R1" [ref=e9]
+    - radio "R2" [checked] [ref=e10]
+    - spinbutton "Qty" [ref=e11]: "3"
+    - slider "Vol" [ref=e12]: "50"
+    - slider "Clamp" [ref=e13]: "10"
+    - textbox "Col" [ref=e14]: "#000000"
+    - textbox "When" [ref=e15]: 2026-11-14
+    - button "Submit" [ref=e16]
+    - button "Reset" [ref=e17]
+    - button "Go" [ref=e18]
+    - button "Send" [ref=e19] [cursor=pointer]
+    - button "Choose File" [ref=e20]
+    - textbox "Pw" [ref=e21]: secret
+    - textbox "Notes" [ref=e22]: Line one
+    - button "Buy" [disabled] [ref=e23]
+    - button "Bold" [pressed] [ref=e24]
+    - button "Mixed" [pressed=mixed] [ref=e25]
+    - button "Menu" [expanded] [ref=e26]
+    - button [ref=e27]:
+      - img "Close" [ref=e28]
+    - group [ref=e29]:
+      - generic [ref=e30]:
+        - text: Group
+        - textbox "InLegend" [ref=e31]
+      - textbox "InSet" [disabled] [ref=e32]
+    - textbox "Bad" [invalid] [ref=e33]
+    - textbox "Sp" [invalid=spelling] [ref=e34]
+    - combobox "Combo" [ref=e35]
+    - meter "M" [ref=e36]
+    - progressbar "P" [ref=e37]
+    - status [ref=e38]: "42"
+  - textbox "unnamed form" [ref=e40]

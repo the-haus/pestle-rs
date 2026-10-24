@@ -1,0 +1,64 @@
+- banner:
+  - link "De Zaal":
+    - /url: /
+  - navigation:
+    - link "Agenda":
+      - /url: /agenda/
+    - link "Info":
+      - /url: /info
+  - img
+- main:
+  - heading "Nora en de Band" [level=1]
+  - time: za 14 november 2026
+  - text: Deuren 19:30 uur Grote Zaal
+  - list:
+    - listitem: Nora en de Band
+    - listitem: Kees de Vries
+  - paragraph: Nora en de Band komen met hun nieuwe plaat naar De Zaal. Nora en de Band komen met hun nieuwe plaat naar De Zaal. Nora en de Band komen met hun nieuwe plaat naar De Zaal. Nora en de Band komen met hun nieuwe plaat naar De Zaal. Nora en de Band komen met hun nieuwe plaat naar De Zaal. Nora en de Band komen met hun nieuwe plaat naar De Zaal. Nora en de Band komen met hun nieuwe plaat naar De Zaal. Nora en de Band komen met hun nieuwe plaat naar De Zaal. Nora en de Band komen met hun nieuwe plaat naar De Zaal. Nora en de Band komen met hun nieuwe plaat naar De Zaal. Nora en de Band komen met hun nieuwe plaat naar De Zaal. Nora en de Band komen met hun nieuwe plaat naar De Zaal. Nora en de Band komen met hun nieuwe plaat naar De Zaal. Nora en de Band komen met hun nieuwe plaat naar De Zaal. Nora en de Band komen met hun nieuwe plaat naar De Zaal. Nora en de Band komen met hun nieuwe plaat naar De Zaal. Nora en de Band komen met hun nieuwe plaat naar De Zaal. Nora en de Band komen met hun nieuwe plaat naar De Zaal. Nora en de Band komen met hun nieuwe plaat naar De Zaal. Nora en de Band komen met hun nieuwe plaat naar De Zaal. Nora en de Band komen met hun nieuwe plaat naar De Zaal. Nora en de Band komen met hun nieuwe plaat naar De Zaal. Nora en de Band komen met hun nieuwe plaat naar De Zaal. Nora en de Band komen met hun nieuwe plaat naar De Zaal. Nora en de Band komen met hun nieuwe plaat naar De Zaal. Nora en de Band komen met hun nieuwe plaat naar De Zaal. Nora en de Band komen met hun nieuwe plaat naar De Zaal. Nora en de Band komen met hun nieuwe plaat naar De Zaal. Nora en de Band komen met hun nieuwe plaat naar De Zaal. Nora en de Band komen met hun nieuwe plaat naar De Zaal.
+  - text: € 25,00
+  - link "Koop tickets":
+    - /url: https://tickets.example/nora
+  - list:
+    - listitem: Indie
+    - listitem: Pop
+  - list:
+    - listitem:
+      - link "Other 0":
+        - /url: /agenda/other-0
+    - listitem:
+      - link "Other 1":
+        - /url: /agenda/other-1
+    - listitem:
+      - link "Other 2":
+        - /url: /agenda/other-2
+    - listitem:
+      - link "Other 3":
+        - /url: /agenda/other-3
+    - listitem:
+      - link "Other 4":
+        - /url: /agenda/other-4
+    - listitem:
+      - link "Other 5":
+        - /url: /agenda/other-5
+    - listitem:
+      - link "Other 6":
+        - /url: /agenda/other-6
+    - listitem:
+      - link "Other 7":
+        - /url: /agenda/other-7
+    - listitem:
+      - link "Other 8":
+        - /url: /agenda/other-8
+    - listitem:
+      - link "Other 9":
+        - /url: /agenda/other-9
+    - listitem:
+      - link "Other 10":
+        - /url: /agenda/other-10
+    - listitem:
+      - link "Other 11":
+        - /url: /agenda/other-11
+  - textbox
+  - button "Aanmelden"
+- contentinfo:
+  - paragraph: De Zaal, Kade 1, Amsterdam

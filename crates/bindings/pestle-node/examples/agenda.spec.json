@@ -1,0 +1,18 @@
+{
+  "title": "h1",
+  "image": { "select": "meta[property='og:image']", "attr": "content", "url": "http" },
+  "events": {
+    "select": "article.event",
+    "all": true,
+    "fields": {
+      "title": "h2",
+      "url": { "select": "h2 a", "attr": "href", "url": "http" },
+      "when": ".date",
+      "acts": ["ul.acts > li"],
+      "headliner": "ul.acts > li:first-child",
+      "price": { "select": ".price", "number": true },
+      "tickets": "a.tickets@href",
+      "soldOut": { "select": ".sold-out", "exists": true }
+    }
+  }
+}

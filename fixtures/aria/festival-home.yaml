@@ -1,0 +1,27 @@
+- navigation:
+  - link "Home":
+    - /url: /
+  - link "Line-up":
+    - /url: /line-up
+  - link "Timetable":
+    - /url: /timetable/zaterdag
+  - link "Tickets":
+    - /url: /tickets
+  - link "Praktisch":
+    - /url: https://www.bestkeptsecret.nl/praktische-informatie
+  - link "Nieuws":
+    - /url: /nieuws/een-artikel
+  - link "Privacy":
+    - /url: /privacy
+  - link "Plattegrond (pdf)":
+    - /url: /files/plattegrond.pdf
+  - link "Mail":
+    - /url: mailto:info@bestkeptsecret.nl
+  - link "Koop je ticket":
+    - /url: https://shop.paylogic.com/abc123
+  - link "Resale":
+    - /url: https://www.ticketswap.nl/festival/best-kept-secret
+  - link "Festivalinfo":
+    - /url: https://www.festivalinfo.nl/festival/123/best-kept-secret
+  - link "Instagram":
+    - /url: https://www.instagram.com/bestkeptsecret

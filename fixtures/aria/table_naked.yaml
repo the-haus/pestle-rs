@@ -1,0 +1,10 @@
+- table:
+  - rowgroup:
+    - row "A":
+      - cell "A"
+  - rowgroup:
+    - row "H":
+      - columnheader "H"
+  - rowgroup:
+    - row "B":
+      - cell "B"

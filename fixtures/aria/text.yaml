@@ -1,0 +1,13 @@
+- paragraph: Softhyphen and zerowidth and nbsp spaces
+- paragraph: Line break
+- text: a b c
+- paragraph: "\"quoted\" - dash: colon # hash"
+- paragraph: "- starts with dash"
+- paragraph: "123"
+- paragraph: "true"
+- paragraph
+- paragraph: "key: value"
+- paragraph: "{braces}"
+- paragraph: it's
+- paragraph: "@at"
+- paragraph: tab here

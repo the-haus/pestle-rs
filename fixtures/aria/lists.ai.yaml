@@ -1,0 +1,17 @@
+- generic [active] [ref=e1]:
+  - list [ref=e2]:
+    - listitem [ref=e3]: One
+    - listitem [ref=e4]:
+      - text: Two
+      - link "link" [ref=e5] [cursor=pointer]:
+        - /url: /t
+  - list [ref=e6]:
+    - listitem [ref=e7]:
+      - paragraph [ref=e8]: Para in li
+  - list [ref=e9]:
+    - listitem [ref=e10]: M
+  - generic [ref=e11]:
+    - term [ref=e12]: Term
+    - definition [ref=e13]: Def
+  - list [ref=e14]: X
+  - text: Pres

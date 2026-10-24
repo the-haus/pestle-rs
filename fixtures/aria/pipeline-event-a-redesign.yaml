@@ -1,0 +1,9 @@
+- link "De Zaal":
+  - /url: /
+- article:
+  - heading "Nora en de Band" [level=2]
+  - paragraph: za 14 november 2026, 20:00
+  - paragraph: Grote Zaal
+  - text: Nora en de Band Kees de Vries
+  - link "€ 25,00":
+    - /url: https://tickets.example/nora

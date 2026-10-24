@@ -1,0 +1,27 @@
+- banner:
+  - link "De Zaal":
+    - /url: /
+  - navigation:
+    - link "Agenda":
+      - /url: /agenda/
+    - link "Info":
+      - /url: /info
+  - img
+- main:
+  - heading "DJ Luna" [level=1]
+  - time: za 5 december 2026
+  - text: Deuren 23:00 uur Grote Zaal
+  - list:
+    - listitem: DJ Luna
+    - listitem: Mo b2b Fem
+  - paragraph: Clubnacht tot de ochtend.
+  - text: € 15,00Uitverkocht
+  - link "Koop tickets":
+    - /url: https://tickets.example/luna
+  - list:
+    - listitem: Techno
+  - list
+  - textbox
+  - button "Aanmelden"
+- contentinfo:
+  - paragraph: De Zaal, Kade 1, Amsterdam

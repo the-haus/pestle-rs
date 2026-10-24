@@ -1,0 +1,8 @@
+- main [ref=e2]:
+  - heading "Lineup" [level=2] [ref=e3]
+  - heading [level=3] [aria-hidden] [ref=e4]: Deco
+  - heading "Visible" [level=2] [ref=e5]
+  - heading "One sub" [level=1] [ref=e6]
+  - heading "Four" [level=4] [ref=e7]
+  - button "Five" [ref=e8]
+  - heading "No level" [ref=e9]

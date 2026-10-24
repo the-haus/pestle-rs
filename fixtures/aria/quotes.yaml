@@ -1,0 +1,10 @@
+- button "Say \"hi\"": x
+- button "back\\slash": x
+- link "Amp":
+  - /url: /a?b=1&c=2
+- paragraph: Ünïcödé — “curly” ✓
+- button "Line break": x
+- heading "yes" [level=2]
+- heading "3.5" [level=2]
+- heading "0x1F" [level=2]
+- heading "-" [level=2]

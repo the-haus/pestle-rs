@@ -1,0 +1,67 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - link "De Zaal" [ref=e3] [cursor=pointer]:
+      - /url: /
+    - navigation [ref=e4]:
+      - link "Agenda" [ref=e5] [cursor=pointer]:
+        - /url: /agenda/
+      - link "Info" [ref=e6] [cursor=pointer]:
+        - /url: /info
+  - main [ref=e9]:
+    - heading "Nora en de Band" [level=1] [ref=e10]
+    - generic [ref=e11]:
+      - time [ref=e12]: za 14 november 2026
+      - text: Deuren 19:30 uur Grote Zaal
+    - list [ref=e13]:
+      - listitem [ref=e14]: Nora en de Band
+      - listitem [ref=e15]: Kees de Vries
+    - paragraph [ref=e17]: Nora en de Band komen met hun nieuwe plaat naar De Zaal. Nora en de Band komen met hun nieuwe plaat naar De Zaal. Nora en de Band komen met hun nieuwe plaat naar De Zaal. Nora en de Band komen met hun nieuwe plaat naar De Zaal. Nora en de Band komen met hun nieuwe plaat naar De Zaal. Nora en de Band komen met hun nieuwe plaat naar De Zaal. Nora en de Band komen met hun nieuwe plaat naar De Zaal. Nora en de Band komen met hun nieuwe plaat naar De Zaal. Nora en de Band komen met hun nieuwe plaat naar De Zaal. Nora en de Band komen met hun nieuwe plaat naar De Zaal. Nora en de Band komen met hun nieuwe plaat naar De Zaal. Nora en de Band komen met hun nieuwe plaat naar De Zaal. Nora en de Band komen met hun nieuwe plaat naar De Zaal. Nora en de Band komen met hun nieuwe plaat naar De Zaal. Nora en de Band komen met hun nieuwe plaat naar De Zaal. Nora en de Band komen met hun nieuwe plaat naar De Zaal. Nora en de Band komen met hun nieuwe plaat naar De Zaal. Nora en de Band komen met hun nieuwe plaat naar De Zaal. Nora en de Band komen met hun nieuwe plaat naar De Zaal. Nora en de Band komen met hun nieuwe plaat naar De Zaal. Nora en de Band komen met hun nieuwe plaat naar De Zaal. Nora en de Band komen met hun nieuwe plaat naar De Zaal. Nora en de Band komen met hun nieuwe plaat naar De Zaal. Nora en de Band komen met hun nieuwe plaat naar De Zaal. Nora en de Band komen met hun nieuwe plaat naar De Zaal. Nora en de Band komen met hun nieuwe plaat naar De Zaal. Nora en de Band komen met hun nieuwe plaat naar De Zaal. Nora en de Band komen met hun nieuwe plaat naar De Zaal. Nora en de Band komen met hun nieuwe plaat naar De Zaal. Nora en de Band komen met hun nieuwe plaat naar De Zaal.
+    - generic [ref=e18]:
+      - text: € 25,00
+      - link "Koop tickets" [ref=e19] [cursor=pointer]:
+        - /url: https://tickets.example/nora
+    - list [ref=e20]:
+      - listitem [ref=e21]: Indie
+      - listitem [ref=e22]: Pop
+    - list [ref=e23]:
+      - listitem [ref=e24]:
+        - link "Other 0" [ref=e25] [cursor=pointer]:
+          - /url: /agenda/other-0
+      - listitem [ref=e26]:
+        - link "Other 1" [ref=e27] [cursor=pointer]:
+          - /url: /agenda/other-1
+      - listitem [ref=e28]:
+        - link "Other 2" [ref=e29] [cursor=pointer]:
+          - /url: /agenda/other-2
+      - listitem [ref=e30]:
+        - link "Other 3" [ref=e31] [cursor=pointer]:
+          - /url: /agenda/other-3
+      - listitem [ref=e32]:
+        - link "Other 4" [ref=e33] [cursor=pointer]:
+          - /url: /agenda/other-4
+      - listitem [ref=e34]:
+        - link "Other 5" [ref=e35] [cursor=pointer]:
+          - /url: /agenda/other-5
+      - listitem [ref=e36]:
+        - link "Other 6" [ref=e37] [cursor=pointer]:
+          - /url: /agenda/other-6
+      - listitem [ref=e38]:
+        - link "Other 7" [ref=e39] [cursor=pointer]:
+          - /url: /agenda/other-7
+      - listitem [ref=e40]:
+        - link "Other 8" [ref=e41] [cursor=pointer]:
+          - /url: /agenda/other-8
+      - listitem [ref=e42]:
+        - link "Other 9" [ref=e43] [cursor=pointer]:
+          - /url: /agenda/other-9
+      - listitem [ref=e44]:
+        - link "Other 10" [ref=e45] [cursor=pointer]:
+          - /url: /agenda/other-10
+      - listitem [ref=e46]:
+        - link "Other 11" [ref=e47] [cursor=pointer]:
+          - /url: /agenda/other-11
+    - generic [ref=e48]:
+      - textbox [ref=e49]
+      - button "Aanmelden" [ref=e50]
+  - contentinfo [ref=e51]:
+    - paragraph [ref=e52]: De Zaal, Kade 1, Amsterdam

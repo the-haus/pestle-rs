@@ -1,0 +1,30 @@
+- generic [active] [ref=e1]:
+  - button "Div button" [ref=e2]
+  - link "Span link" [ref=e3]
+  - checkbox "Mixed" [checked=mixed] [ref=e4]
+  - switch "On" [checked] [ref=e5]
+  - tablist [ref=e6]:
+    - tab "T1" [selected] [ref=e7]
+    - tab "T2" [ref=e8]
+  - tabpanel [ref=e9]: Panel
+  - alert [ref=e10]: Alert!
+  - button "Second valid" [ref=e11]
+  - generic [ref=e12]: Invalid role
+  - generic [ref=e13]: Generic
+  - generic "Lab" [ref=e14]: None with label
+  - menu [ref=e15]:
+    - menuitem "Item" [disabled] [ref=e16]
+  - button "Inherit dis" [disabled] [ref=e18]
+  - slider "S"
+  - treeitem "Tree" [expanded] [level=2] [ref=e19]
+  - code [ref=e20]: code
+  - emphasis [ref=e21]: em
+  - strong [ref=e22]: strong
+  - mark [ref=e23]: mark
+  - time [ref=e24]: time
+  - deletion [ref=e25]: del
+  - insertion [ref=e26]: ins
+  - subscript [ref=e27]: sub
+  - superscript [ref=e28]: sup
+  - blockquote [ref=e29]: quote
+  - separator [ref=e30]

@@ -1,0 +1,30 @@
+//! Simplified HTTP request grammar.
+//!
+//! # Resource Limits
+//! This grammar does not configure input-size, cumulative-call, or time limits.
+//! For untrusted input, apply limits appropriate to your workload. Automatic
+//! native-stack checks in supported `std` builds are best-effort, not deadlines
+//! or memory bounds. See the [resource-limit guidance].
+//!
+//! [resource-limit guidance]: https://github.com/pest-parser/pest/blob/master/SECURITY.md#parsing-untrusted-input
+
+http = { SOI ~ (delimiter | request)* ~ EOI}
+
+request = {	
+	request_line ~
+    headers? ~
+    NEWLINE
+}
+
+request_line = _{ method ~ " "+ ~ uri ~ " "+ ~ "HTTP/" ~ version ~ NEWLINE }
+uri = { (!whitespace ~ ANY)+ }
+method = { ("GET" | "DELETE" | "POST" | "PUT") }
+version = { (ASCII_DIGIT | ".")+ }
+whitespace = _{ " " | "\t" }
+
+headers = { header+ }
+header = { header_name ~ ":" ~ whitespace ~ header_value ~ NEWLINE }
+header_name = { (!(NEWLINE | ":") ~ ANY)+ }
+header_value = { (!NEWLINE ~ ANY)+ }
+
+delimiter = { NEWLINE+ }

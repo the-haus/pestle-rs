@@ -1,0 +1,25 @@
+<!doctype html><html><head><style>
+[x-cloak] { display: none !important; }
+.menu { display: none }
+@media (min-width: 768px) { .menu--desktop { display: block } .mobile-only { display: none } }
+@media print { .print-hidden { display: none } }
+@media (max-width: 600px) { .wide-hidden { display: none } }
+.ghost { visibility: hidden }
+.ghost .shown { visibility: visible }
+#shout { display: none }
+#shout.loud { display: block }
+div.important-none { display: none !important }
+.btn { cursor: pointer }
+.inline-list li { display: inline }
+nav ul > li.sep { display: none }
+/* a comment { display: none } */
+.cv { content-visibility: hidden }
+</style></head><body>
+<div x-cloak>Cloaked</div><ul class="menu"><li>Hidden menu</li></ul><ul class="menu menu--desktop"><li>Desktop menu</li></ul>
+<p class="mobile-only">Mobile only</p><p class="print-hidden">Not print</p><p class="wide-hidden">Wide</p>
+<div class="ghost">Ghost <span class="shown">but shown</span></div><p id="shout">Quiet</p><p id="shout" class="loud">Loud</p>
+<div class="important-none" style="display:block">Important wins</div><p style="display:none" class="x">Inline none</p>
+<div class="btn" role="button" tabindex="0">Pointer</div><ul class="inline-list"><li>A</li><li>B</li></ul>
+<nav><ul><li>One</li><li class="sep">|</li><li>Two</li></ul></nav><div class="cv"><p>Skipped content</p></div>
+<style>.late { display: none }</style><p class="late">Late rule</p>
+</body></html>

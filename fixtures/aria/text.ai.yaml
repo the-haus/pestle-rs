@@ -1,0 +1,17 @@
+- generic [active] [ref=e1]:
+  - paragraph [ref=e2]: Softhyphen and zerowidth and nbsp spaces
+  - paragraph [ref=e3]: Linebreak
+  - generic [ref=e4]:
+    - text: a
+    - generic [ref=e5]: b
+    - text: c
+  - paragraph [ref=e6]: "\"quoted\" - dash: colon # hash"
+  - paragraph [ref=e7]: "- starts with dash"
+  - paragraph [ref=e8]: "123"
+  - paragraph [ref=e9]: "true"
+  - paragraph
+  - paragraph [ref=e10]: "key: value"
+  - paragraph [ref=e11]: "{braces}"
+  - paragraph [ref=e12]: it's
+  - paragraph [ref=e13]: "@at"
+  - paragraph [ref=e14]: tab here

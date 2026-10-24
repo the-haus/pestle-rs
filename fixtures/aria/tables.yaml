@@ -1,0 +1,33 @@
+- table "Timetable":
+  - caption: Timetable
+  - rowgroup:
+    - row "Time Act":
+      - columnheader "Time"
+      - columnheader "Act"
+    - row "20:00 Nora":
+      - cell "20:00"
+      - cell "Nora"
+    - row "21:00 Kofi":
+      - rowheader "21:00"
+      - cell "Kofi"
+- table "Sum":
+  - rowgroup:
+    - row "A":
+      - columnheader "A"
+  - rowgroup:
+    - row "1":
+      - cell "1"
+- text: Layout
+- grid:
+  - rowgroup:
+    - row "G":
+      - gridcell "G"
+- table:
+  - rowgroup:
+    - row "Only"
+- table:
+  - rowgroup:
+    - row "Mid x":
+      - cell
+      - rowheader "Mid"
+      - cell "x"

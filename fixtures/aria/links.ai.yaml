@@ -1,0 +1,23 @@
+- navigation "Main" [ref=e2]:
+  - link "Buy tickets for Nora" [ref=e3] [cursor=pointer]:
+    - /url: /a
+    - text: Tickets
+  - link "More about Nora" [ref=e4] [cursor=pointer]:
+    - /url: /b
+    - text: → More about Nora
+  - link "Follow us" [ref=e5] [cursor=pointer]:
+    - /url: /c
+    - img "Instagram" [ref=e6]
+  - text: Follow us
+  - link:
+    - /url: /d
+  - link [ref=e8] [cursor=pointer]:
+    - /url: /f
+  - link [ref=e9] [cursor=pointer]:
+    - /url: /g
+    - img "Logo" [ref=e10]
+  - text: No href
+  - link "data" [ref=e11] [cursor=pointer]:
+    - /url: data:text/plain,…
+  - link "Only title":
+    - /url: /h

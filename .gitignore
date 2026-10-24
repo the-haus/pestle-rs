@@ -1,0 +1,19 @@
+target/
+node_modules/
+dist/
+*.node
+*.tsbuildinfo
+.yarn/*
+!.yarn/releases
+.pnp.*
+/packages/
+.idea/
+bench/.work/
+test/.dbg*
+/install-check/
+# Copied into the npm package at pack time (copy-license), and napi's release dirs.
+crates/bindings/pestle-node/LICENSE-*
+crates/bindings/pestle-node/CHANGELOG.md
+crates/bindings/pestle-node/npm/
+crates/bindings/pestle-node/artifacts/
+crates/bindings/pestle-node/*.tgz

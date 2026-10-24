@@ -1,0 +1,8 @@
+# LF everywhere, on every platform: the tests compare pages, snapshots and
+# stripped output byte for byte.
+* text=auto eol=lf
+
+# Binaries.
+*.node binary
+*.gz binary
+*.tgz binary

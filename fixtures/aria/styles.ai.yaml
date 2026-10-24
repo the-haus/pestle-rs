@@ -1,0 +1,15 @@
+- generic [active] [ref=e1]:
+  - list [ref=e2]:
+    - listitem [ref=e3]: Desktop menu
+  - paragraph [ref=e4]: Not print
+  - paragraph [ref=e5]: Wide
+  - text: but shown
+  - paragraph [ref=e6]: Loud
+  - button "Pointer" [ref=e7] [cursor=pointer]
+  - list [ref=e8]:
+    - listitem [ref=e9]: A
+    - listitem [ref=e10]: B
+  - navigation [ref=e11]:
+    - list [ref=e12]:
+      - listitem [ref=e13]: One
+      - listitem [ref=e14]: Two

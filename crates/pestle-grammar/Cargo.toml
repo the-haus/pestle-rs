@@ -1,0 +1,20 @@
+[package]
+name = "pestle-grammar"
+description = "pest grammars compiled at run time: parse trees, and values shaped by node tags."
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+pest.workspace = true
+pest_meta.workspace = true
+serde_json.workspace = true
+memchr.workspace = true
+stacker = "0.1"
+smallvec = "1.13"
+
+[dev-dependencies]
+pest_vm = { version = "2.9.4", features = ["grammar-extras"] }
+pest_derive = { version = "2.9.4", features = ["grammar-extras"] }

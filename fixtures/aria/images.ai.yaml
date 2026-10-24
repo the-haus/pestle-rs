@@ -1,0 +1,8 @@
+- generic [active] [ref=e1]:
+  - img "Titled" [ref=e3]
+  - figure "Nora live" [ref=e4]:
+    - img "Nora" [ref=e5]
+  - figure [ref=e7]
+  - img "Chart" [ref=e9]
+  - img [ref=e11]:
+    - generic [ref=e12]: SVG text

@@ -1,0 +1,22 @@
+- main:
+  - heading "Zomerfeest 2027" [level=1]
+  - time: 12 en 13 juni 2027
+  - heading "Zaterdag 12 juni" [level=2]
+  - heading "Main" [level=3]
+  - text: Nora en de Band
+  - time: 14:00
+  - text: –
+  - time: 15:00
+  - text: The Weekenders
+  - time: 16:00
+  - text: –
+  - time: 17:15
+  - heading "Bos" [level=3]
+  - text: DJ Luna
+  - time: 23:00
+  - text: –
+  - time: 01:00
+  - heading "Zondag 13 juni" [level=2]
+  - heading "Main" [level=3]
+  - text: Moonlight Orchestra
+  - time: 20:00

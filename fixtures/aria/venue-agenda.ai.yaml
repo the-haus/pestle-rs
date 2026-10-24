@@ -1,0 +1,22 @@
+- list [ref=e2]:
+  - listitem [ref=e3]:
+    - link "John Craigie" [ref=e4] [cursor=pointer]:
+      - /url: /programma/john-craigie/2889434
+  - listitem [ref=e5]:
+    - link "PJ Morton" [ref=e6] [cursor=pointer]:
+      - /url: /programma/pj-morton/2892511
+  - listitem [ref=e7]:
+    - link "PJ Morton (again)" [ref=e8] [cursor=pointer]:
+      - /url: /programma/pj-morton/2892511
+  - listitem [ref=e9]:
+    - link "Some night" [ref=e10] [cursor=pointer]:
+      - /url: /en/agenda/some-night
+  - listitem [ref=e11]:
+    - link "Zaalverhuur" [ref=e12] [cursor=pointer]:
+      - /url: /zaalverhuur/grote-zaal
+  - listitem [ref=e13]:
+    - link "Agenda" [ref=e14] [cursor=pointer]:
+      - /url: /programma
+  - listitem [ref=e15]:
+    - link "Elsewhere" [ref=e16] [cursor=pointer]:
+      - /url: https://elsewhere.example/programma/x/1

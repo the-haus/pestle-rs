@@ -1,0 +1,5 @@
+- generic "body" [active] [ref=e1]:
+  - generic [ref=e2]: Text bold it
+  - iframe [ref=e3]
+  - paragraph [ref=e4]: After iframe
+  - paragraph [ref=e5]: After body

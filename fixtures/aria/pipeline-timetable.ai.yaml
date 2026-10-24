@@ -1,0 +1,31 @@
+- main [ref=e2]:
+  - heading "Zomerfeest 2027" [level=1] [ref=e3]
+  - time [ref=e4]: 12 en 13 juni 2027
+  - generic [ref=e5]:
+    - heading "Zaterdag 12 juni" [level=2] [ref=e6]
+    - generic [ref=e7]:
+      - heading "Main" [level=3] [ref=e8]
+      - generic [ref=e9]:
+        - text: Nora en de Band
+        - time [ref=e10]: 14:00
+        - text: –
+        - time [ref=e11]: 15:00
+      - generic [ref=e12]:
+        - text: The Weekenders
+        - time [ref=e13]: 16:00
+        - text: –
+        - time [ref=e14]: 17:15
+    - generic [ref=e15]:
+      - heading "Bos" [level=3] [ref=e16]
+      - generic [ref=e17]:
+        - text: DJ Luna
+        - time [ref=e18]: 23:00
+        - text: –
+        - time [ref=e19]: 01:00
+  - generic [ref=e20]:
+    - heading "Zondag 13 juni" [level=2] [ref=e21]
+    - generic [ref=e22]:
+      - heading "Main" [level=3] [ref=e23]
+      - generic [ref=e24]:
+        - text: Moonlight Orchestra
+        - time [ref=e25]: 20:00

@@ -1,0 +1,38 @@
+[workspace]
+members = [
+    "crates/pestle-grammar",
+    "crates/pestle-html",
+    "crates/bindings/pestle-node",
+    "bench/rust",
+]
+resolver = "2"
+
+[workspace.package]
+edition = "2021"
+version = "0.1.0"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/the-haus/pestle-rs"
+rust-version = "1.87"
+
+[workspace.dependencies]
+# Internal crates.
+pestle-grammar = { path = "crates/pestle-grammar", version = "=0.1.0" }
+pestle-html = { path = "crates/pestle-html", version = "=0.1.0" }
+
+# External crates.
+pest = "2.9.4"
+pest_meta = { version = "2.9.4", features = ["grammar-extras"] }
+memchr = "2.7"
+regex = "1.11"
+serde_json = { version = "1", features = ["preserve_order", "float_roundtrip"] }
+sha2 = "0.10"
+url = "2.5"
+encoding_rs = "0.8.35"
+flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
+mimalloc = { version = "0.1", default-features = false }
+
+[profile.release]
+lto = "fat"
+codegen-units = 1
+debug = 1
+panic = "unwind"

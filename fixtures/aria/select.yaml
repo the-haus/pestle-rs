@@ -1,0 +1,13 @@
+- text: City
+- combobox "City":
+  - option "Amsterdam"
+  - option "Utrecht" [selected]
+- listbox "Multi":
+  - option "A" [selected]
+  - option "B"
+  - option "C" [selected]
+- listbox "Size":
+  - option "A"
+  - option "B"
+- combobox "Groups"
+- combobox "Empty"

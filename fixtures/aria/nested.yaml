@@ -1,0 +1,14 @@
+- link "Card title Card text":
+  - /url: /x
+  - heading "Card title" [level=3]
+  - paragraph: Card text
+- button "Icon Label"
+- link "InlineJoined":
+  - /url: /y
+- link "Block Split":
+  - /url: /z
+- text: Name
+- textbox "Name"
+- text: Agree
+- checkbox "Agree now"
+- text: now

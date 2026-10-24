@@ -1,0 +1,29 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - link "De Zaal" [ref=e3] [cursor=pointer]:
+      - /url: /
+    - navigation [ref=e4]:
+      - link "Agenda" [ref=e5] [cursor=pointer]:
+        - /url: /agenda/
+      - link "Info" [ref=e6] [cursor=pointer]:
+        - /url: /info
+  - main [ref=e9]:
+    - heading "The Weekenders" [level=1] [ref=e10]
+    - generic [ref=e11]:
+      - time [ref=e12]: za 21 november 2026
+      - text: Deuren 20:00 uur Kleine Zaal
+    - list [ref=e13]:
+      - listitem [ref=e14]: The Weekenders
+    - paragraph [ref=e16]: Gitaarrock uit Utrecht.
+    - generic [ref=e17]:
+      - text: € 18,50
+      - link "Koop tickets" [ref=e18] [cursor=pointer]:
+        - /url: https://tickets.example/weekenders
+    - list [ref=e19]:
+      - listitem [ref=e20]: Rock
+    - list
+    - generic [ref=e21]:
+      - textbox [ref=e22]
+      - button "Aanmelden" [ref=e23]
+  - contentinfo [ref=e24]:
+    - paragraph [ref=e25]: De Zaal, Kade 1, Amsterdam

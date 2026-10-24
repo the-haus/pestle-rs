@@ -1,0 +1,14 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]: Site header
+  - main [ref=e3]:
+    - article [ref=e4]:
+      - generic [ref=e5]: Article header
+      - generic [ref=e6]: Article footer
+    - generic [ref=e7]: No name
+    - region "Named" [ref=e8]: Named section
+    - complementary [ref=e9]: Side
+    - search [ref=e10]: S
+  - contentinfo [ref=e11]: Site footer
+  - banner [ref=e12]: Div banner
+  - region "Region head" [ref=e13]: Reg
+  - heading "Region head" [level=2] [ref=e14]

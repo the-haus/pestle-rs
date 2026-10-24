@@ -1,0 +1,49 @@
+// pest. The Elegant Parser
+// Copyright (c) 2018 Dragoș Tiselice
+//
+// Licensed under the Apache License, Version 2.0
+// <LICENSE-APACHE or http://www.apache.org/licenses/LICENSE-2.0> or the MIT
+// license <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
+// option. All files in the project carrying such notice may not be copied,
+// modified, or distributed except according to those terms.
+
+//! A parser for JSON file.
+//!
+//! And this is a example for JSON parser.
+//!
+//! # Resource Limits
+//! This grammar does not configure input-size, cumulative-call, or time limits.
+//! For untrusted input, apply limits appropriate to your workload. Automatic
+//! native-stack checks in supported `std` builds are best-effort, not deadlines
+//! or memory bounds. See the [resource-limit guidance].
+//!
+//! [resource-limit guidance]: https://github.com/pest-parser/pest/blob/master/SECURITY.md#parsing-untrusted-input
+json = { SOI ~ value ~ EOI }
+
+/// Matches object, e.g.: `{ "foo": "bar" }`
+/// Foobar
+object = { "{" ~ pair ~ ("," ~ pair)* ~ "}" | "{" ~ "}" }
+pair   = { string ~ ":" ~ value }
+
+array = { "[" ~ value ~ ("," ~ value)* ~ "]" | "[" ~ "]" }
+
+
+//////////////////////
+/// Matches value, e.g.: `"foo"`, `42`, `true`, `null`, `[]`, `{}`.
+//////////////////////
+value = { string | number | object | array | bool | null }
+
+string  = @{ "\"" ~ inner ~ "\"" }
+inner   = @{ (!("\"" | "\\" | '\u{0000}'..'\u{001F}') ~ ANY)* ~ (escape ~ inner)? }
+escape  = @{ "\\" ~ ("\"" | "\\" | "/" | "b" | "f" | "n" | "r" | "t" | unicode) }
+unicode = @{ "u" ~ ASCII_HEX_DIGIT{4} }
+
+number = @{ "-"? ~ int ~ ("." ~ ASCII_DIGIT+ ~ exp? | exp)? }
+int    = @{ "0" | ASCII_NONZERO_DIGIT ~ ASCII_DIGIT* }
+exp    = @{ ("E" | "e") ~ ("+" | "-")? ~ ASCII_DIGIT+ }
+
+bool = { "true" | "false" }
+
+null = { "null" }
+
+WHITESPACE = _{ " " | "\t" | "\r" | "\n" }

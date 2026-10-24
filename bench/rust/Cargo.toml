@@ -1,0 +1,17 @@
+[package]
+name = "pestle-bench"
+description = "pestle against other HTML parsers and grammar engines (not published)."
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+pestle-html.workspace = true
+pestle-grammar.workspace = true
+serde_json.workspace = true
+scraper = "0.29"
+lol_html = "3"
+tl = "0.7"
+pest = "2.9.4"
+pest_derive = "2.9.4"

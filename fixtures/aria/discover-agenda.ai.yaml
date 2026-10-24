@@ -1,0 +1,13 @@
+- list [ref=e2]:
+  - listitem [ref=e3]:
+    - link "Band A" [ref=e4] [cursor=pointer]:
+      - /url: /agenda/2026-11-03-band-a
+  - listitem [ref=e5]:
+    - link "Band B" [ref=e6] [cursor=pointer]:
+      - /url: /agenda/2027-01-10-band-b#tickets
+  - listitem [ref=e7]:
+    - link "Flyer" [ref=e8] [cursor=pointer]:
+      - /url: /files/flyer.pdf
+  - listitem [ref=e9]:
+    - link "Facebook" [ref=e10] [cursor=pointer]:
+      - /url: https://facebook.com/fest

@@ -1,0 +1,10 @@
+- banner:
+  - navigation:
+    - link "Agenda":
+      - /url: /agenda
+    - link "Line-up":
+      - /url: /line-up
+    - link "RA":
+      - /url: https://ra.co/x
+- main:
+  - heading "Fest" [level=1]

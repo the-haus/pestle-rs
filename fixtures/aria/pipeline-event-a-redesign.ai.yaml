@@ -1,0 +1,10 @@
+- generic [ref=e2]:
+  - link "De Zaal" [ref=e4] [cursor=pointer]:
+    - /url: /
+  - article [ref=e5]:
+    - heading "Nora en de Band" [level=2] [ref=e6]
+    - paragraph [ref=e7]: za 14 november 2026, 20:00
+    - paragraph [ref=e8]: Grote Zaal
+    - generic [ref=e9]: Nora en de Band Kees de Vries
+    - link "€ 25,00" [ref=e11] [cursor=pointer]:
+      - /url: https://tickets.example/nora

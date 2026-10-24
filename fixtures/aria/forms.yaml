@@ -1,0 +1,41 @@
+- form "Search form":
+  - text: Search
+  - searchbox "Search"
+  - text: Email
+  - textbox "Email": a@b.nl
+  - textbox "Only placeholder"
+  - textbox "T":
+    - /placeholder: P
+  - checkbox "Agree" [checked]
+  - text: Agree
+  - radio "R1"
+  - radio "R2" [checked]
+  - spinbutton "Qty": "3"
+  - slider "Vol": "50"
+  - slider "Clamp": "10"
+  - textbox "Col": "#000000"
+  - textbox "When": 2026-11-14
+  - button "Submit"
+  - button "Reset"
+  - button "Go"
+  - button "Send"
+  - button "Choose File"
+  - textbox "Pw": secret
+  - textbox "Notes": Line one
+  - button "Buy" [disabled]
+  - button "Bold" [pressed]
+  - button "Mixed" [pressed=mixed]
+  - button "Menu" [expanded]
+  - button "Close":
+    - img "Close"
+  - group "Group":
+    - text: Group
+    - textbox "InLegend"
+    - textbox "InSet" [disabled]
+  - textbox "Bad" [invalid]
+  - textbox "Sp" [invalid=spelling]
+  - combobox "Combo"
+  - meter "M"
+  - progressbar "P"
+  - status: "42"
+- textbox "unnamed form"

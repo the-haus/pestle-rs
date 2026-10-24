@@ -1,0 +1,11 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - navigation [ref=e3]:
+      - link "Agenda" [ref=e4] [cursor=pointer]:
+        - /url: /agenda
+      - link "Line-up" [ref=e5] [cursor=pointer]:
+        - /url: /line-up
+      - link "RA" [ref=e6] [cursor=pointer]:
+        - /url: https://ra.co/x
+  - main [ref=e7]:
+    - heading "Fest" [level=1] [ref=e8]

@@ -1,0 +1,22 @@
+- list:
+  - listitem:
+    - link "John Craigie":
+      - /url: /programma/john-craigie/2889434
+  - listitem:
+    - link "PJ Morton":
+      - /url: /programma/pj-morton/2892511
+  - listitem:
+    - link "PJ Morton (again)":
+      - /url: /programma/pj-morton/2892511
+  - listitem:
+    - link "Some night":
+      - /url: /en/agenda/some-night
+  - listitem:
+    - link "Zaalverhuur":
+      - /url: /zaalverhuur/grote-zaal
+  - listitem:
+    - link "Agenda":
+      - /url: /programma
+  - listitem:
+    - link "Elsewhere":
+      - /url: https://elsewhere.example/programma/x/1

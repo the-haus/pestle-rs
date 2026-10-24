@@ -1,0 +1,28 @@
+[package]
+name = "pestle-html"
+description = "Streaming HTML extraction for scrapers: CSS selectors over a token stream, no DOM; page metadata, links, embedded JSON and structured data (JSON-LD, microdata, RDFa, microformats) in one pass, in any charset."
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[features]
+default = []
+# Fields that parse their value with a pest grammar (`parse`).
+grammar = ["dep:pestle-grammar"]
+
+[dependencies]
+pestle-grammar = { workspace = true, optional = true }
+memchr.workspace = true
+regex.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+url.workspace = true
+encoding_rs.workspace = true
+flate2.workspace = true
+smallvec = "1.13"
+serde = { version = "1", features = ["derive"] }
+simdutf8 = "0.1"
+# Grows the stack for the accessibility snapshot's walks over deeply nested pages.
+stacker = "0.1"

@@ -1,0 +1,10 @@
+- img
+- img "Titled"
+- figure "Nora live":
+  - img "Nora"
+  - text: Nora live
+- figure:
+  - img
+- img "Chart"
+- img: SVG text
+- img

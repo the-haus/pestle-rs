@@ -1,0 +1,115 @@
+# Release everything for a v* tag (or a dry run by hand):
+#
+# 1. check: versions agree with the tag (scripts/check-version.mjs), the
+#    workspace builds and its tests pass, and the CHANGELOG section becomes
+#    the release notes;
+# 2. npm: @pestle-rs/node and its eight platform packages (release-node.yml);
+# 3. github-release: a GitHub release with the notes, the npm tarballs and
+#    their checksums.
+#
+# The crates (pestle-html, pestle-grammar) are packaged and checked but not
+# published to crates.io yet.
+#
+# Secrets: NPM_TOKEN (or npm trusted publishing).
+# Environments: npm-publish (add reviewers to gate it).
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: Build and check everything but publish nothing.
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry-run }}
+
+jobs:
+  check:
+    name: check versions, build and test
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-node-yarn
+      - id: version
+        name: versions agree (with the tag)
+        shell: bash
+        run: |
+          TAG=""
+          [[ "$GITHUB_REF" == refs/tags/v* ]] && TAG="$GITHUB_REF_NAME"
+          echo "version=$(node scripts/check-version.mjs ${TAG:+"$TAG"})" >> "$GITHUB_OUTPUT"
+      - name: release notes from CHANGELOG.md
+        shell: bash
+        env:
+          V: ${{ steps.version.outputs.version }}
+        run: |
+          awk -v v="$V" '$0 ~ "^## "v"( |$)" {on=1; next} on && /^## / {exit} on' CHANGELOG.md > notes.md
+          test -s notes.md
+      - uses: actions/upload-artifact@v5
+        with:
+          name: release-notes
+          path: notes.md
+          retention-days: 1
+      - uses: ./.github/actions/setup-rust
+        with:
+          cache-key: release-check
+          components: rustfmt,clippy
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - run: cargo test --workspace --locked --release --exclude pestle-node
+      - run: cargo test -p pestle-html --features grammar --locked --release
+      - name: the crates package
+        run: cargo package --workspace --exclude pestle-node --exclude pestle-bench --locked --no-verify
+
+  npm:
+    needs: check
+    uses: ./.github/workflows/release-node.yml
+    with:
+      dry-run: ${{ github.event_name == 'workflow_dispatch' && inputs.dry-run }}
+    secrets:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+    permissions:
+      contents: read
+      id-token: write
+
+  github-release:
+    name: GitHub release
+    needs: [check, npm]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: npm-packages
+          path: dist
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-notes
+          path: dist
+      - name: checksums
+        working-directory: dist
+        run: sha256sum pestle-rs-node-*.tgz > SHA256SUMS && cat SHA256SUMS
+      - name: create the release
+        if: env.DRY_RUN != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.check.outputs.version }}
+        shell: bash
+        run: |
+          PRE=(); [[ "$VERSION" == *-* ]] && PRE=(--prerelease)
+          gh release create "v$VERSION" --repo "$GITHUB_REPOSITORY" --title "v$VERSION" --notes-file dist/notes.md "${PRE[@]}" \
+            dist/pestle-rs-node-*.tgz dist/SHA256SUMS

@@ -1,0 +1,55 @@
+# The official conformance suites, checked out at pinned commits into
+# bench/.work/suites (where the tests look; without a checkout they skip):
+#
+# - W3C json-ld-api: JSON-LD 1.1 toRdf, every test in scope (Rust);
+# - microformats/tests: microformats2 and the classic formats (Rust);
+# - W3C RDFa 1.1 test suite, HTML5 host language (Node).
+#
+# Weekly too, so a fix upstream is not missed for long.
+name: suites
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "17 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  suites:
+    name: JSON-LD 1.1, RDFa 1.1, microformats
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - name: check out the suites
+        shell: bash
+        run: |
+          fetch() {
+            git init -q "bench/.work/suites/$1"
+            git -C "bench/.work/suites/$1" fetch -q --depth 1 "https://github.com/$2.git" "$3"
+            git -C "bench/.work/suites/$1" checkout -q FETCH_HEAD
+          }
+          fetch json-ld-api w3c/json-ld-api 55514738d854e56bb8bad4c53cda2f0e23be4a50
+          fetch mf-tests microformats/tests d49f5d76d0395676274c9ff15f1a14091498d7d4
+          fetch rdfa rdfa/rdfa.github.io b388107da8900b6f2a0c42d95ab468e6cf554a4a
+      - uses: ./.github/actions/setup-rust
+        with:
+          cache-key: suites
+      - name: JSON-LD 1.1 toRdf and microformats
+        run: cargo test -p pestle-html --release --locked --test jsonld_suite --test mf_suite -- --nocapture
+      - uses: ./.github/actions/setup-node-yarn
+      - run: corepack yarn install --immutable
+      - name: RDFa 1.1 (HTML5)
+        working-directory: crates/bindings/pestle-node
+        run: |
+          corepack yarn run build
+          node bench/rdfa-suite.mjs

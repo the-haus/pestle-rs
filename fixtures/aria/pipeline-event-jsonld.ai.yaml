@@ -1,0 +1,11 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - link "De Zaal" [ref=e3] [cursor=pointer]:
+      - /url: /
+  - main [ref=e4]:
+    - heading "Moonlight Orchestra & Friends" [level=1] [ref=e5]
+    - generic [ref=e6]:
+      - time [ref=e7]: za 12 december 2026
+      - text: Grote Zaal
+    - list [ref=e8]:
+      - listitem [ref=e9]: Klassiek

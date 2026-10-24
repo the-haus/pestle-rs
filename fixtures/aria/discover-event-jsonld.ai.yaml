@@ -1,0 +1,6 @@
+- main [ref=e2]:
+  - heading "Band A" [level=1] [ref=e3]
+  - list [ref=e4]:
+    - listitem [ref=e5]: Band A
+    - listitem [ref=e6]: Support
+  - time [ref=e8]: 3 nov

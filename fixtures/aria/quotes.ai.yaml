@@ -1,0 +1,11 @@
+- generic [active] [ref=e1]:
+  - button "Say \"hi\"" [ref=e2]: x
+  - button "back\\slash" [ref=e3]: x
+  - link "Amp" [ref=e4] [cursor=pointer]:
+    - /url: /a?b=1&c=2
+  - paragraph [ref=e5]: Ünïcödé — “curly” ✓
+  - button "Line break" [ref=e6]: x
+  - heading "yes" [level=2] [ref=e7]
+  - heading "3.5" [level=2] [ref=e8]
+  - heading "0x1F" [level=2] [ref=e9]
+  - heading "-" [level=2] [ref=e10]

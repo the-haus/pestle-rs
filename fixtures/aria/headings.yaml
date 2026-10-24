@@ -1,0 +1,7 @@
+- main:
+  - heading "Lineup" [level=2]
+  - heading "Visible" [level=2]
+  - heading "One sub" [level=1]
+  - heading "Four" [level=4]
+  - button "Five"
+  - heading "No level"

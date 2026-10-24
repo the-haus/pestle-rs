@@ -1,0 +1,5 @@
+- group: More Loose text
+- group:
+  - text: Open
+  - paragraph: Shown body
+- dialog: Open dialog

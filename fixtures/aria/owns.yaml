@@ -1,0 +1,9 @@
+- listbox "L":
+  - option "One"
+  - option "Two" [selected]
+- button "Hello World": Hello
+- text: World
+- textbox "Hidden label"
+- combobox "CB":
+  - listbox:
+    - option "Picked" [selected]

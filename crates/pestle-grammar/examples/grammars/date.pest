@@ -1,0 +1,7 @@
+WHITESPACE = _{ " " }
+when    = { weekday? ~ #day = day ~ #month = month ~ (#year = year)? ~ ("·" ~ #time = time)? }
+weekday = @{ ("ma" | "di" | "wo" | "do" | "vr" | "za" | "zo") ~ "."? }
+day     = @{ ASCII_DIGIT{1,2} }
+month   = @{ ASCII_ALPHA+ }
+year    = @{ ASCII_DIGIT{4} }
+time    = @{ ASCII_DIGIT{2} ~ ":" ~ ASCII_DIGIT{2} }

@@ -1,0 +1,16 @@
+- generic [active] [ref=e1]:
+  - text: City
+  - combobox "City" [ref=e2]:
+    - option "Amsterdam"
+    - option "Utrecht" [selected]
+  - listbox "Multi" [ref=e3]:
+    - option "A" [selected] [ref=e4]
+    - option "B" [ref=e5]
+    - option "C" [selected] [ref=e6]
+  - listbox "Size" [ref=e7]:
+    - option "A" [ref=e8]
+    - option "B" [ref=e9]
+  - combobox "Groups" [ref=e10]:
+    - option "X" [disabled]
+    - option "Y" [selected]
+  - combobox "Empty" [ref=e11]

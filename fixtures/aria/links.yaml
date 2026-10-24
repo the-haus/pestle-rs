@@ -1,0 +1,22 @@
+- navigation "Main":
+  - link "Buy tickets for Nora":
+    - /url: /a
+    - text: Tickets
+  - link "More about Nora":
+    - /url: /b
+  - link "Follow us":
+    - /url: /c
+    - img "Instagram"
+  - text: Follow us
+  - link:
+    - /url: /d
+  - link:
+    - /url: /f
+  - link "Logo":
+    - /url: /g
+    - img "Logo"
+  - text: No href
+  - link "data":
+    - /url: data:text/plain,…
+  - link "Only title":
+    - /url: /h

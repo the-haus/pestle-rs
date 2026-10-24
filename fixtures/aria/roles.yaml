@@ -1,0 +1,29 @@
+- button "Div button"
+- link "Span link"
+- checkbox "Mixed" [checked=mixed]
+- switch "On" [checked]
+- tablist:
+  - tab "T1" [selected]
+  - tab "T2"
+- tabpanel: Panel
+- alert: Alert!
+- button "Second valid"
+- text: Invalid role
+- generic: Generic
+- text: None with label
+- menu:
+  - menuitem "Item" [disabled]
+- button "Inherit dis" [disabled]
+- slider "S"
+- treeitem "Tree" [expanded] [level=2]
+- code: code
+- emphasis: em
+- strong: strong
+- mark: mark
+- time: time
+- deletion: del
+- insertion: ins
+- subscript: sub
+- superscript: sup
+- blockquote: quote
+- separator

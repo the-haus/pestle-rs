@@ -1,0 +1,11 @@
+- banner: Site header
+- main:
+  - article: Article header Article footer
+  - text: No name
+  - region "Named": Named section
+  - complementary: Side
+  - search: S
+- contentinfo: Site footer
+- banner: Div banner
+- region "Region head": Reg
+- heading "Region head" [level=2]
