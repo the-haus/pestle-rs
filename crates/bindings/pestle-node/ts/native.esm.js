@@ -74,6 +74,7 @@ export const {
   NativeGrammar,
   NativeExtractor,
   NativeSession,
+  NativeShaper,
   NativeRobots,
   NativeSitemapReader,
   hasGrammars,
