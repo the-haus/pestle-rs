@@ -104,6 +104,18 @@ pub fn cut(s: &str, max: usize) -> &str {
     }
 }
 
+/// At most `max` bytes, cut where a character starts.
+pub fn cut_bytes(s: &str, max: usize) -> &str {
+    if s.len() <= max {
+        return s;
+    }
+    let mut at = max;
+    while !s.is_char_boundary(at) {
+        at -= 1;
+    }
+    &s[..at]
+}
+
 /// Text for HTML: `&`, `<` and `>` escaped.
 pub fn escape_text(s: &str, out: &mut String) {
     for c in s.chars() {
@@ -136,5 +148,8 @@ mod tests {
         assert_eq!(collapse("  a \u{a0}\n b\u{200b}c  "), "a b c");
         assert_eq!(collapse("\t\n"), "");
         assert_eq!(cut("été", 2), "ét");
+        assert_eq!(cut_bytes("été", 2), "é");
+        assert_eq!(cut_bytes("été", 1), "");
+        assert_eq!(cut_bytes("été", 9), "été");
     }
 }

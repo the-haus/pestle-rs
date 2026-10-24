@@ -149,4 +149,32 @@ describe("reads what festimap reads", () => {
       expect(strip(html).html, `seed ${seed}`).toBe(cleanForLearn(html).html);
     }
   });
+
+  it("the stripped page cut where cleanForLearn cuts it, in UTF-16 units", () => {
+    // Characters past U+FFFF (two units each) before every space, and budgets that cut
+    // the head, the body, a text run, an attribute. Where festimap cuts one of them in
+    // half it keeps a lone surrogate; pestle writes U+FFFD, the same bytes in UTF-8.
+    const astral = (s: string) => s.replace(/(\w{3}) /g, "$1𝕊ᑭ🎸 ");
+    const utf8 = (s: string) => Buffer.from(s).toString("hex");
+    for (const { name, html } of pages) {
+      for (const page of [html, astral(html)]) {
+        for (const tokens of [40, 150, 600, 2_500, 8_000]) {
+          const got = strip(page, { maxChars: tokens * 3 });
+          const want = cleanForLearn(page, tokens);
+          expect(got.html.length, `${name} at ${tokens}`).toBe(want.html.length);
+          expect(utf8(got.html), `${name} at ${tokens}`).toBe(utf8(want.html));
+          expect(got.truncated, `${name} at ${tokens}`).toBe(want.truncated);
+          expect(got.tokens).toBe(Math.ceil(got.html.length / 3));
+        }
+      }
+    }
+    for (let seed = 1600; seed < 1800; seed++) {
+      const html = astral(messyHtml(random(seed), 600));
+      for (const tokens of [20, 60, 200]) {
+        expect(utf8(strip(html, { maxChars: tokens * 3 }).html), `seed ${seed} at ${tokens}`).toBe(
+          utf8(cleanForLearn(html, tokens).html),
+        );
+      }
+    }
+  });
 });

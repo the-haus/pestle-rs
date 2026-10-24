@@ -344,3 +344,33 @@ fn bot_walls() {
     assert_eq!(p.links[0].text, "Bezoekersinfo");
     assert_eq!(p.headings[0].text, "Lineup");
 }
+
+#[test]
+fn a_script_past_max_script_bytes_is_not_read_at_all() {
+    let x = Extractor::new(
+        &json!({}),
+        &Default::default(),
+        ExtractorOptions {
+            page: Some(PageOptions {
+                max_script_bytes: 40,
+                ..PageOptions::default()
+            }),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    // Streamed: the long run passes the limit; the end must not join onto the start
+    // (`{"page":"ok"}` before).
+    let mut s = x.session(None);
+    s.write(br#"<script id="__NEXT_DATA__" type="application/json">{"page":""#);
+    s.write(&[b'x'; 60]);
+    s.write(br#"ok"}</script><script id="b" type="application/json">{"b":1}</script>"#);
+    let p = s.finish().page.unwrap();
+    let names: Vec<&str> = p.embedded.iter().map(|e| e.name.as_str()).collect();
+    assert_eq!(names, ["b"]);
+    assert!(
+        p.warnings.iter().any(|w| w.contains("max_script_bytes")),
+        "{:?}",
+        p.warnings
+    );
+}

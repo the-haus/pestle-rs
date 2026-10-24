@@ -373,6 +373,102 @@ fn strip_collapses_alike_siblings_and_keeps_the_budget() {
     assert!(stripped.html.len() < 260);
 }
 
+fn stripped(html: &str, o: StripOptions) -> crate::Stripped {
+    let options = ExtractorOptions {
+        strip: Some(o),
+        ..ExtractorOptions::default()
+    };
+    run(json!({}), &Grammars::new(), options, html).stripped.unwrap()
+}
+
+fn budget(max_chars: usize) -> StripOptions {
+    StripOptions {
+        max_chars,
+        ..StripOptions::default()
+    }
+}
+
+#[test]
+fn strip_counts_utf16_units_as_festimap_does() {
+    // 𝕊 is two units; é is one (two bytes).
+    let o = || StripOptions {
+        max_text: 6,
+        ..StripOptions::default()
+    };
+    assert_eq!(stripped("<p>ab𝕊cdef</p>", o()).html, "<p>ab𝕊cd…</p>");
+    assert_eq!(stripped("<p>éééééééé</p>", o()).html, "<p>éééééé…</p>");
+    // Cut through 𝕊: JavaScript keeps half of it, a lone surrogate, which is U+FFFD in UTF-8.
+    assert_eq!(stripped("<p>abcde𝕊f</p>", o()).html, "<p>abcde\u{FFFD}…</p>");
+    assert_eq!(stripped("<p>abcde xyz</p>", o()).html, "<p>abcde…</p>");
+    // trimEnd before the `…` (an attribute is not collapsed first), but not of a
+    // zero-width space, which is not JavaScript whitespace.
+    let attr = |v: &str| {
+        let o = StripOptions {
+            max_attr: 6,
+            ..StripOptions::default()
+        };
+        stripped(&format!("<b title=\"{v}\">x</b>"), o).html
+    };
+    assert_eq!(attr("abcde\u{a0}xyz"), "<b title=\"abcde…\">x</b>");
+    assert_eq!(attr("abcde\u{200b}xyz"), "<b title=\"abcde\u{200b}…\">x</b>");
+    let s = stripped("<p>🎸🎸🎸</p>", StripOptions::default());
+    assert_eq!(s.tokens, 5, "13 units, 3 each");
+    // The budget: `<b></b>` is reserved first (7), then 6 units of é: 13 bytes, 6 units.
+    assert_eq!(stripped("<b>éééééé</b>", budget(9)).html, "<b>éééééé</b>");
+    assert_eq!(stripped("<b>éééééé</b>", budget(8)).html, "<b></b>");
+}
+
+#[test]
+fn strip_counts_the_head_from_the_start_wherever_it_is() {
+    // festimap writes the title and JSON-LD first, so a block at the end of the body takes
+    // its room from the start: the second paragraph is past the budget.
+    let json = format!(r#"{{"name":"{}"}}"#, "x".repeat(40));
+    let html = format!(
+        r#"<body><div><p>first</p><p>second</p></div><script type="application/ld+json">{json}</script></body>"#
+    );
+    let head = format!("<script type=\"application/ld+json\">{json}</script>\n");
+    let room = head.len() + "<div></div><p></p>first".len();
+    let s = stripped(
+        &html,
+        StripOptions {
+            max_chars: room,
+            ..StripOptions::default()
+        },
+    );
+    assert!(s.truncated);
+    assert_eq!(s.html, format!("{head}<div><p>first</p></div>"));
+    // An empty wrapper's tags count before festimap's regex drops them: 18 units are
+    // written when `<p></p>` asks for 7 more, past 23. Then `<div></div>` stays, as the
+    // regex leaves it once its `<span></span>` is gone.
+    let s = stripped("<div><span></span><p>abc</p></div>", budget(23));
+    assert_eq!(s.html, "<div></div>");
+    assert_eq!(
+        stripped("<div><span></span><p>abc</p></div>", budget(25)).html,
+        "<div><p>abc</p></div>"
+    );
+}
+
+#[test]
+fn max_capture_cuts_text_and_markup_at_the_same_byte_however_it_streams() {
+    // `run` also reads it in chunks of 1 to 7 bytes: the same values each time.
+    let html = format!("<div><p>{}</p><b>x</b></div>", "é".repeat(20));
+    let options = || ExtractorOptions {
+        max_capture: 20,
+        ..ExtractorOptions::default()
+    };
+    let out = run(
+        json!({ "h": { "select": "div", "html": true }, "t": "div" }),
+        &Grammars::new(),
+        options(),
+        &html,
+    );
+    let d = out.data.to_json();
+    // 20 bytes: `<div><p>` and six é, no `</p>` joined on after the cut.
+    assert_eq!(d["h"], format!("<div><p>{}", "é".repeat(6)));
+    // Text: the spaces `<div>` and `<p>` start with count before they are trimmed.
+    assert_eq!(d["t"], "é".repeat(9));
+}
+
 #[test]
 fn deep_and_hostile_input_stays_bounded() {
     let deep = "<div>".repeat(100_000) + "x";

@@ -154,6 +154,100 @@ fn filter_by_type_and_raw_forms() {
 }
 
 #[test]
+fn raw_json_ld_keeps_each_block_in_its_place() {
+    let page = r#"<script type="application/ld+json">{"@type":"Event","name":"A"}</script>
+<script type="application/ld+json">{"@type":"Event","name":"B",}</script>
+<script type="application/ld+json">totally broken</script>
+<script type="application/ld+json">{"@type":"Event","name":"C"}{"@type":"Event","name":"D"}</script>
+<script type="application/ld+json"></script>
+<script type="application/ld+json">{"@type":"Event","name":"E"}</script>"#;
+    for strict in [false, true] {
+        let mut o = StructuredOptions {
+            raw: true,
+            ..Default::default()
+        };
+        o.json_ld_options.strict = strict;
+        let x = Extractor::new(
+            &json!({}),
+            &Default::default(),
+            ExtractorOptions {
+                structured: Some(o),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let blocks = x
+            .extract(page.as_bytes(), None)
+            .structured
+            .unwrap()
+            .raw
+            .unwrap()
+            .json_ld;
+        let names: Vec<Value> = blocks.iter().map(|b| b["name"].clone()).collect();
+        if strict {
+            assert_eq!(
+                names,
+                [
+                    json!("A"),
+                    Value::Null,
+                    Value::Null,
+                    Value::Null,
+                    Value::Null,
+                    json!("E")
+                ]
+            );
+            assert!(blocks[1..5].iter().all(Value::is_null));
+        } else {
+            assert_eq!(
+                names,
+                [
+                    json!("A"),
+                    json!("B"),
+                    Value::Null,
+                    Value::Null,
+                    Value::Null,
+                    json!("E")
+                ]
+            );
+            assert_eq!(blocks[2], Value::Null);
+            assert_eq!(
+                blocks[3],
+                json!([{"@type":"Event","name":"C"}, {"@type":"Event","name":"D"}])
+            );
+            assert_eq!(blocks[4], Value::Null);
+        }
+    }
+}
+
+#[test]
+fn a_block_past_max_block_bytes_is_cut_once() {
+    // Streamed in pieces: the long one passes the limit, the short one after it must not join on.
+    let mut o = StructuredOptions {
+        raw: true,
+        ..Default::default()
+    };
+    o.max_block_bytes = 40;
+    let x = Extractor::new(
+        &json!({}),
+        &Default::default(),
+        ExtractorOptions {
+            structured: Some(o),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    let mut s = x.session(None);
+    s.write(br#"<script type="application/ld+json">{"@type":"Event","name":"Nora"#);
+    s.write(&[b'x'; 30]);
+    s.write(br#""}</script>"#);
+    let structured = s.finish().structured.unwrap();
+    let block = &structured.raw.unwrap().json_ld[0];
+    // The first 40 bytes, read as the truncated block they are (before: `Nora`, the end spliced on).
+    assert_eq!(block["name"], format!("Nora{}", "x".repeat(11)), "{block}");
+    assert!(structured.warnings.iter().any(|w| w.contains("max_block_bytes")));
+}
+
+#[test]
 fn hostile_input_never_breaks_it() {
     let x = Extractor::new(
         &json!({}),

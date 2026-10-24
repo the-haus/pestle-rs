@@ -102,6 +102,8 @@ pub struct Structured {
 
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct Raw {
+    /// One entry per JSON-LD `<script>`, in page order: `null` for a block that cannot be read,
+    /// an array for several values glued together in one.
     #[serde(rename = "jsonLd")]
     pub json_ld: Vec<Value>,
     pub microdata: Value,
@@ -118,8 +120,8 @@ pub(crate) struct StructuredPass {
     base_raw: Option<String>,
     base_seen: bool,
     blocks: Vec<String>,
-    /// The JSON-LD script being read: its depth and text.
-    script: Option<(usize, String)>,
+    /// The JSON-LD script being read: its depth, its text, and whether it was cut.
+    script: Option<(usize, String, bool)>,
     warnings: Vec<String>,
     microdata: Option<Microdata>,
     rdfa: Option<Rdfa>,
@@ -168,7 +170,12 @@ impl StructuredPass {
                             }
                             w
                         }
-                        Err(_) => Some("json-ld: a block was left out: it is not JSON".into()),
+                        Err(_) => {
+                            if self.opts.raw {
+                                raw.json_ld.push(Value::Null);
+                            }
+                            Some("json-ld: a block was left out: it is not JSON".into())
+                        }
                     };
                     if let Some(w) = warning.filter(|w| !self.warnings.contains(w)) {
                         self.warnings.push(w);
@@ -186,7 +193,14 @@ impl StructuredPass {
                     j.block(v);
                 }
                 if self.opts.raw {
-                    raw.json_ld.extend(read.values);
+                    // One entry per block, so a block keeps its place when one before it breaks:
+                    // `null` when nothing can be read, values glued together as one array.
+                    let mut values = read.values;
+                    raw.json_ld.push(match values.len() {
+                        0 => Value::Null,
+                        1 => values.pop().unwrap_or_default(),
+                        _ => Value::Array(values),
+                    });
                 }
             }
         }
@@ -267,7 +281,7 @@ impl Handler for StructuredPass {
                 t.contains("ld+json") || t.contains("json+ld") || t.contains("jsonld")
             })
         {
-            self.script = Some((depth, String::new()));
+            self.script = Some((depth, String::new(), false));
         }
         let base = self.base.clone();
         let base_raw = self.base_raw.clone();
@@ -284,8 +298,8 @@ impl Handler for StructuredPass {
 
     fn close(&mut self, tree: &Tree) {
         let depth = tree.frames.len() - 1;
-        if self.script.as_ref().is_some_and(|(d, _)| *d == depth) {
-            if let Some((_, text)) = self.script.take() {
+        if self.script.as_ref().is_some_and(|(d, ..)| *d == depth) {
+            if let Some((_, text, _)) = self.script.take() {
                 self.blocks.push(text);
             }
         }
@@ -303,11 +317,18 @@ impl Handler for StructuredPass {
 
     fn text(&mut self, _: &Tree, text: &Text<'_>) {
         let t = text.get();
-        if let Some((_, s)) = &mut self.script {
-            if s.len() + t.len() <= self.opts.max_block_bytes {
+        if let Some((_, s, cut)) = &mut self.script {
+            if *cut {
+            } else if s.len() + t.len() <= self.opts.max_block_bytes {
                 s.push_str(t);
-            } else if !self.warnings.iter().any(|w| w.starts_with("json-ld: a block")) {
-                self.warnings.push("json-ld: a block was cut at max_block_bytes".into());
+            } else {
+                // What fits, and nothing after it: a later, shorter run would not join on.
+                s.push_str(crate::text::cut_bytes(t, self.opts.max_block_bytes - s.len()));
+                *cut = true;
+                let w = "json-ld: a block was cut at max_block_bytes";
+                if !self.warnings.iter().any(|x| x == w) {
+                    self.warnings.push(w.into());
+                }
             }
         }
         if let Some(m) = &mut self.microdata {

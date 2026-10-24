@@ -47,7 +47,7 @@ is one event, its formats listed in `formats`.
 | `flatten` | `false` | also list every item that sits inside another (a product's offer, an event's place) as an item of its own |
 | `events` | `true` | the flat events view |
 | `mergeEvents` | `true` | one event for the same event stated twice |
-| `raw` | `false` | also each format in its own standard form (microdata's WHATWG JSON, RDFa's triples, mf2 JSON) |
+| `raw` | `false` | also each format in its own standard form (the JSON-LD blocks, one entry per `<script>` in page order, `null` for one that cannot be read; microdata's WHATWG JSON, RDFa's triples, mf2 JSON) |
 | `arrays` | `false` | every property value as an array |
 | `detailed` | `false` | literals with language/datatype as `{ "@value", … }`, links as `{ "@id" }` |
 | `embed` | `true` | embed the item a link (`@id`, `itemid`, an RDFa subject) names |

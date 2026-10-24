@@ -81,9 +81,12 @@ export interface SkeletonOptions {
   paths?: boolean;
 }
 
-/** Options of the stripped page (defaults: festimap's learn prompt). */
+/**
+ * Options of the stripped page (defaults: festimap's learn prompt). Every length is in UTF-16
+ * units, as `string.length` counts them: an emoji or `𝕊` is two.
+ */
 export interface StripOptions {
-  /** The budget in characters (default 36,000: 12k tokens). */
+  /** The budget (default 36,000: 12k tokens). */
   maxChars?: number;
   /** A text run longer than this is cut with `…` (80). */
   maxText?: number;
@@ -188,7 +191,17 @@ export interface StructuredEvent {
 export interface Structured {
   items: StructuredItem[];
   events: StructuredEvent[];
-  raw?: { jsonLd: unknown[]; microdata: unknown; rdfa: unknown[]; microformats: unknown };
+  raw?: {
+    /**
+     * One entry per JSON-LD `<script>`, in page order, so `jsonLd[i]` is the page's i-th block
+     * even when one before it is broken: `null` for a block that cannot be read, an array for
+     * several values glued together in one.
+     */
+    jsonLd: unknown[];
+    microdata: unknown;
+    rdfa: unknown[];
+    microformats: unknown;
+  };
   /** What was repaired or cut (`json-ld: trailing commas`). */
   warnings: string[];
 }
@@ -267,7 +280,7 @@ export interface Skeleton {
 
 export interface Stripped {
   html: string;
-  /** Estimated: 3 characters a token. */
+  /** Estimated: `html.length / 3`, rounded up. */
   tokens: number;
   truncated: boolean;
 }

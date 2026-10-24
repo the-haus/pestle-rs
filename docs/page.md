@@ -67,7 +67,7 @@ x.extract(bytes, { url, charset: charsetOf(res.headers.get("content-type")) }); 
 Two outputs festimap's pipeline uses, byte for byte:
 
 - `strip(html, options)` is `cleanForLearn`: the page cut down to a
-  budget for a model's prompt (36,000 characters by default): scripts,
+  budget for a model's prompt (36,000 by default, counted in UTF-16 units\n  as `string.length` counts them, festimap's measure): scripts,
   styles and boilerplate out, long text and attributes cut, alike siblings
   past four collapsed to a comment, the title, meta and JSON-LD up front.
   `{ html, tokens, truncated }`.

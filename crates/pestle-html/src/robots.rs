@@ -96,7 +96,7 @@ impl Robots {
 
     /// The rules of the groups for `token` (else `*`) in `text`.
     pub fn parse(text: &str, token: &str) -> Robots {
-        let text = crate::text::cut(text, MAX_BYTES);
+        let text = crate::text::cut_bytes(text, MAX_BYTES);
         let text = text.strip_prefix('\u{feff}').unwrap_or(text);
         let token = product_token(token);
         let mut groups: Vec<Group> = Vec::new();
@@ -360,6 +360,17 @@ fn matches(pattern: &str, path: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn only_the_first_512_kib_are_read() {
+        // 512 KiB of comments in a two-byte character, then a rule: past the limit in bytes.
+        let pad = format!("# {}\n", "é".repeat(1000));
+        let filler = pad.repeat(MAX_BYTES / pad.len() + 1);
+        let r = Robots::parse(&format!("User-agent: *\n{filler}Disallow: /late\n"), "bot");
+        assert!(r.allows("/late"));
+        let r = Robots::parse(&format!("User-agent: *\nDisallow: /early\n{filler}"), "bot");
+        assert!(!r.allows("/early"));
+    }
 
     #[test]
     fn groups_and_precedence() {

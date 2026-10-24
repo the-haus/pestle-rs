@@ -247,6 +247,8 @@ enum Capture {
     Heading(u8),
     /// A script's text: its name when it is JSON, none for JavaScript to look into.
     Script(Option<String>),
+    /// A script past `max_script_bytes`: not read, and nothing more joins on.
+    Dropped,
 }
 
 pub(crate) struct PagePass {
@@ -592,6 +594,7 @@ impl PagePass {
                     }
                 }
             }
+            Capture::Dropped => {}
             Capture::Script(name) => {
                 if self.page.embedded.len() >= self.opts.max_embedded {
                     return;
@@ -786,6 +789,8 @@ impl Handler for PagePass {
                     if s.len() + t.len() <= max_script {
                         s.push_str(t);
                     } else {
+                        *c = Capture::Dropped;
+                        *s = String::new();
                         cut_script = true;
                     }
                 }

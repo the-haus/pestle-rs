@@ -7,6 +7,8 @@
 //! `<!-- N more alike -->`; wrappers left empty dropped; the whole stopped
 //! at the budget, open tags closed.
 
+use std::fmt::Write as _;
+
 use regex::Regex;
 
 use crate::skeleton::DEFAULT_IGNORE;
@@ -16,7 +18,9 @@ use crate::tree::{Handler, Text, Tree};
 /// Options of the strip pass (festimap's defaults).
 #[derive(Clone, Debug)]
 pub struct StripOptions {
-    /// The output's budget, in characters (festimap: 12k tokens, 3 characters each).
+    /// The output's budget (festimap: 12k tokens, 3 characters each). This and
+    /// every other length here is in UTF-16 units, as JavaScript's `length`
+    /// counts: a character past U+FFFF (an emoji, 𝕊) is two.
     pub max_chars: usize,
     /// A text run longer than this is cut (`…`).
     pub max_text: usize,
@@ -84,7 +88,7 @@ impl Default for StripOptions {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Stripped {
     pub html: String,
-    /// Its estimated tokens: 3 characters each.
+    /// Its estimated tokens: 3 UTF-16 units each.
     pub tokens: usize,
     /// The budget cut it short.
     pub truncated: bool,
@@ -95,31 +99,109 @@ fn bare(name: &str) -> bool {
     matches!(name, "area" | "br" | "col" | "embed" | "hr" | "img" | "meta" | "wbr")
 }
 
-/// At most `max` characters, `…` when cut.
+/// The length of `s` in UTF-16 units, as JavaScript measures `length`: a
+/// character past U+FFFF counts twice.
+pub(crate) fn units(s: &str) -> usize {
+    // Every byte but a continuation byte starts a character; a 4-byte one starts two units.
+    s.bytes()
+        .map(|b| usize::from((b as i8) >= -0x40) + usize::from(b >= 0xF0))
+        .sum()
+}
+
+/// What JavaScript's `trimEnd` takes off: `\s` without the zero-width space.
+fn trim_end(s: &str) -> &str {
+    s.trim_end_matches(|c| c != '\u{200b}' && crate::text::is_space(c))
+}
+
+/// At most `max` UTF-16 units, `…` when cut: festimap's
+/// `s.slice(0, max).trimEnd() + "…"`. A cut through a character past U+FFFF
+/// leaves JavaScript half of it, a lone surrogate, written U+FFFD here (as
+/// any UTF-8 encoder writes it).
 fn cut(s: &str, max: usize) -> String {
-    match s.char_indices().nth(max) {
-        Some((at, _)) => format!("{}…", s[..at].trim_end()),
-        None => s.to_owned(),
+    if s.len() <= max {
+        // At most one unit per byte: nothing to cut.
+        return s.to_owned();
+    }
+    let mut n = 0;
+    for (at, c) in s.char_indices() {
+        let w = c.len_utf16();
+        if n + w > max {
+            return if n < max {
+                format!("{}\u{FFFD}…", &s[..at])
+            } else {
+                format!("{}…", trim_end(&s[..at]))
+            };
+        }
+        n += w;
+    }
+    s.to_owned()
+}
+
+/// festimap's last step, `.replace(/<(div|span|…)(?: class="[^"]*")?><\/\1>/g, "")`
+/// on the whole output: each of `names` written empty, with no attribute but
+/// `class`, taken out, in one pass (`<div><span></span></div>` keeps its `<div>`).
+fn drop_empty(html: String, names: &[String]) -> String {
+    let b = html.as_bytes();
+    let matched = |i: usize| -> Option<usize> {
+        names.iter().find_map(|n| {
+            let mut j = i + 1;
+            b[j..].starts_with(n.as_bytes()).then_some(())?;
+            j += n.len();
+            if b[j..].starts_with(b" class=\"") {
+                j += 8;
+                j += memchr::memchr(b'"', &b[j..])? + 1;
+            }
+            (b[j..].starts_with(b"></")
+                && b[j + 3..].starts_with(n.as_bytes())
+                && b.get(j + 3 + n.len()) == Some(&b'>'))
+            .then_some(j + 4 + n.len())
+        })
+    };
+    let mut out: Option<String> = None;
+    let (mut from, mut at) = (0, 0);
+    while let Some(i) = memchr::memchr(b'<', &b[at..]).map(|i| at + i) {
+        match matched(i) {
+            Some(end) => {
+                out.get_or_insert_with(|| String::with_capacity(html.len()))
+                    .push_str(&html[from..i]);
+                from = end;
+                at = end;
+            }
+            None => at = i + 1,
+        }
+    }
+    match out {
+        Some(mut out) => {
+            out.push_str(&html[from..]);
+            out
+        }
+        None => html,
     }
 }
 
 #[derive(Default)]
 struct Level {
-    /// Its tag was written (not dropped, collapsed, or `<html>`/`<body>`).
-    written: bool,
     /// Nothing inside is written.
     skip: bool,
-    /// Where its start tag begins in the body, and where it ends.
-    mark: usize,
-    open_end: usize,
-    close: String,
-    /// It may go when empty.
-    droppable: bool,
-    /// Something was written inside it (even if dropped again): festimap's
-    /// single-pass regex keeps `<div></div>` once its empty `<span>` is gone.
-    wrote: bool,
+    /// Its start tag was written, and it has an end tag: its [`Element`]'s index.
+    element: Option<usize>,
     alike: Vec<(String, usize)>,
     collapsed: usize,
+}
+
+/// An element written: where its start tag begins in the body, how long its
+/// name is, and where its end tag begins (`usize::MAX` while it is open).
+struct Element {
+    open: usize,
+    name: usize,
+    close: usize,
+}
+
+/// A budget check: the body's length in bytes when it was made, and the
+/// UTF-16 units the body would have had with what was to be written.
+struct Check {
+    at: usize,
+    need: usize,
 }
 
 pub(crate) struct StripPass {
@@ -132,9 +214,21 @@ pub(crate) struct StripPass {
     json_ld: String,
     in_json_ld: Option<usize>,
     json_text: String,
+    /// The body as festimap writes it before its last step ([`drop_empty`]):
+    /// only ever appended to, so it can be cut back to any check.
     body: String,
     levels: Vec<Level>,
     top: Level,
+    /// The UTF-16 units of the title, `<meta>`s and JSON-LD, and of the body.
+    head_units: usize,
+    body_units: usize,
+    elements: Vec<Element>,
+    /// Each check that needed more than every one before it. festimap writes
+    /// the head first, so the whole head counts against the body from its
+    /// start; here a `<title>` or a JSON-LD block late in the page is only
+    /// known when it ends, so the body is cut back at the end, to the first
+    /// check the whole head fails.
+    checks: Vec<Check>,
     truncated: bool,
     /// Text since the last tag or comment: one text node, as htmlparser2 makes it.
     pending: String,
@@ -155,6 +249,10 @@ impl StripPass {
             body: String::new(),
             levels: Vec::new(),
             top: Level::default(),
+            head_units: 0,
+            body_units: 0,
+            elements: Vec::new(),
+            checks: Vec::new(),
             truncated: false,
             pending: String::new(),
         }
@@ -171,20 +269,25 @@ impl StripPass {
         }
         let mut s = String::new();
         escape_text(&cut(&t, self.o.max_text), &mut s);
-        if self.full(s.len()) {
+        let n = units(&s);
+        if self.full(n) {
             self.truncated = true;
             return;
         }
-        self.parent().wrote = true;
         self.body.push_str(&s);
+        self.body_units += n;
     }
 
-    fn length(&self) -> usize {
-        self.title.as_ref().map_or(0, String::len) + self.metas.len() + self.json_ld.len() + self.body.len()
-    }
-
-    fn full(&self, reserve: usize) -> bool {
-        self.length() + reserve > self.o.max_chars
+    /// Whether `reserve` more units would pass the budget (with the head read so far).
+    fn full(&mut self, reserve: usize) -> bool {
+        let need = self.body_units + reserve;
+        if self.checks.last().is_none_or(|c| need > c.need) {
+            self.checks.push(Check {
+                at: self.body.len(),
+                need,
+            });
+        }
+        self.head_units + need > self.o.max_chars
     }
 
     fn parent(&mut self) -> &mut Level {
@@ -192,28 +295,49 @@ impl StripPass {
     }
 
     /// The comment for a level's collapsed children, written inside it.
-    fn flush_collapsed(level: &mut Level, body: &mut String) {
+    fn flush_collapsed(level: &mut Level, body: &mut String, units: &mut usize) {
         if level.collapsed > 0 {
-            body.push_str(&format!("<!-- {} more alike -->", level.collapsed));
-            level.wrote = true;
+            let at = body.len();
+            let _ = write!(body, "<!-- {} more alike -->", level.collapsed);
+            *units += body.len() - at;
         }
         level.collapsed = 0;
     }
 
     pub(crate) fn finish(mut self) -> Stripped {
         self.flush_text();
-        if !self.truncated {
+        // The first check that fails with the whole head is where festimap stopped:
+        // the body up to it, and the end tags of the elements open there.
+        let room = self.o.max_chars.saturating_sub(self.head_units);
+        let stop = self.checks.partition_point(|c| c.need <= room);
+        if let Some(c) = self.checks.get(stop) {
+            self.truncated = true;
+            let at = c.at;
+            let open: Vec<&Element> = self.elements.iter().filter(|e| e.open < at && at <= e.close).collect();
+            let mut body = String::with_capacity(at + open.len() * 8);
+            body.push_str(&self.body[..at]);
+            for e in open.iter().rev() {
+                body.push_str("</");
+                body.push_str(&self.body[e.open + 1..e.open + 1 + e.name]);
+                body.push('>');
+            }
+            self.body = body;
+        } else {
+            debug_assert!(!self.truncated);
             let mut top = std::mem::take(&mut self.top);
-            Self::flush_collapsed(&mut top, &mut self.body);
+            Self::flush_collapsed(&mut top, &mut self.body, &mut self.body_units);
         }
-        let mut html = String::with_capacity(self.length());
+        let mut html = String::with_capacity(
+            self.title.as_ref().map_or(0, String::len) + self.metas.len() + self.json_ld.len() + self.body.len(),
+        );
         if let Some(t) = &self.title {
             html.push_str(t);
         }
         html.push_str(&self.metas);
         html.push_str(&self.json_ld);
         html.push_str(&self.body);
-        let tokens = html.chars().count().div_ceil(3);
+        let html = drop_empty(html, &self.o.drop_empty);
+        let tokens = units(&html).div_ceil(3);
         Stripped {
             html,
             tokens,
@@ -228,7 +352,7 @@ impl StripPass {
             if !data && !self.o.keep_attrs.iter().any(|k| k == name) {
                 continue;
             }
-            if data && value.chars().count() > self.o.max_attr {
+            if data && units(value) > self.o.max_attr {
                 continue;
             }
             s.push(' ');
@@ -268,6 +392,7 @@ impl Handler for StripPass {
                             m.push_str("\" content=\"");
                             escape_attr(&cut(&content, self.o.max_attr), &mut m);
                             m.push_str("\">\n");
+                            self.head_units += units(&m);
                             self.metas.push_str(&m);
                         }
                         self.meta_keys.push(key);
@@ -319,20 +444,19 @@ impl Handler for StripPass {
             return;
         }
         let mut body = std::mem::take(&mut self.body);
-        Self::flush_collapsed(self.parent(), &mut body);
+        let mut body_units = self.body_units;
+        Self::flush_collapsed(self.parent(), &mut body, &mut body_units);
         self.body = body;
+        self.body_units = body_units;
         if el.kind == crate::tags::HTML || el.kind == crate::tags::BODY {
             self.levels.push(Level::default());
             return;
         }
         let attrs = self.attributes(el);
-        let open = format!("<{name}{attrs}>");
-        let close = if bare(name) {
-            String::new()
-        } else {
-            format!("</{name}>")
-        };
-        if self.full(open.len() + close.len()) {
+        let name_units = units(name);
+        let open_units = name_units + units(&attrs) + 2;
+        let close_units = if bare(name) { 0 } else { name_units + 3 };
+        if self.full(open_units + close_units) {
             self.truncated = true;
             self.levels.push(Level {
                 skip: true,
@@ -340,22 +464,21 @@ impl Handler for StripPass {
             });
             return;
         }
-        let droppable = self.o.drop_empty.iter().any(|n| n == name)
-            && (attrs.is_empty() || {
-                // Exactly ` class="…"`, as festimap's regex reads it.
-                attrs
-                    .strip_prefix(" class=\"")
-                    .is_some_and(|rest| rest.find('"').is_some_and(|q| q + 1 == rest.len()))
+        let element = (!bare(name)).then(|| {
+            self.elements.push(Element {
+                open: self.body.len(),
+                name: name.len(),
+                close: usize::MAX,
             });
-        self.parent().wrote = true;
-        let mark = self.body.len();
-        self.body.push_str(&open);
+            self.elements.len() - 1
+        });
+        self.body.push('<');
+        self.body.push_str(name);
+        self.body.push_str(&attrs);
+        self.body.push('>');
+        self.body_units += open_units;
         self.levels.push(Level {
-            written: true,
-            mark,
-            open_end: self.body.len(),
-            close,
-            droppable,
+            element,
             ..Level::default()
         });
     }
@@ -367,14 +490,17 @@ impl Handler for StripPass {
             let mut t = String::from("<title>");
             escape_text(&cut(&collapse(&self.title_text), self.o.max_text), &mut t);
             t.push_str("</title>\n");
+            self.head_units += units(&t);
             self.title = Some(t);
             self.in_title = None;
         }
         if self.in_json_ld == Some(d) {
             let json = collapse(&self.json_text);
+            let at = self.json_ld.len();
             self.json_ld.push_str("<script type=\"application/ld+json\">");
             self.json_ld.push_str(&cut(&json, self.o.max_json_ld));
             self.json_ld.push_str("</script>\n");
+            self.head_units += units(&self.json_ld[at..]);
             self.json_text.clear();
             self.in_json_ld = None;
         }
@@ -383,15 +509,15 @@ impl Handler for StripPass {
             return;
         }
         if !self.truncated {
-            Self::flush_collapsed(&mut level, &mut self.body);
+            Self::flush_collapsed(&mut level, &mut self.body, &mut self.body_units);
         }
-        if level.written {
-            if level.droppable && !level.wrote {
-                debug_assert_eq!(self.body.len(), level.open_end);
-                self.body.truncate(level.mark);
-            } else {
-                self.body.push_str(&level.close);
-            }
+        if let Some(i) = level.element {
+            let name = tree.frames[d].el.name();
+            self.elements[i].close = self.body.len();
+            self.body.push_str("</");
+            self.body.push_str(name);
+            self.body.push('>');
+            self.body_units += units(name) + 3;
         }
     }
 

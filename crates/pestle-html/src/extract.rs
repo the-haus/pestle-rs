@@ -73,7 +73,9 @@ struct Capture {
     nonempty: bool,
     /// The instance its object fills.
     child: Option<usize>,
+    /// Its text, or its markup, reached the most one value may hold: nothing more joins on.
     full: bool,
+    html_full: bool,
     /// How it reads text (its field's `read`, kept here for the hot loops).
     mode: Mode,
 }
@@ -223,6 +225,7 @@ impl Engine {
             nonempty: false,
             child: None,
             full: false,
+            html_full: false,
             mode: match def.read {
                 Read::Visible => Mode::Visible,
                 Read::Raw => Mode::Raw,
@@ -431,8 +434,8 @@ impl Engine {
             return;
         }
         if cap.text.len() + text.len() > max {
-            let room = crate::text::cut(text, max.saturating_sub(cap.text.len())).len();
-            cap.text.push_str(&text[..room.min(text.len())]);
+            cap.text
+                .push_str(crate::text::cut_bytes(text, max.saturating_sub(cap.text.len())));
             cap.full = true;
         } else {
             cap.text.push_str(text);
@@ -572,11 +575,14 @@ impl Handler for Engine {
         last.extend_from_slice(raw);
         let max = self.max_capture;
         for cap in &mut self.captures {
-            if let Some(html) = &mut cap.html {
+            if let Some(html) = cap.html.as_mut().filter(|_| !cap.html_full) {
+                let raw = utf8(raw);
                 if html.len() + raw.len() <= max {
-                    html.push_str(&utf8(raw));
+                    html.push_str(&raw);
                 } else {
-                    cap.full = true;
+                    // The first `max` bytes, however the page came in chunks.
+                    html.push_str(crate::text::cut_bytes(&raw, max - html.len()));
+                    cap.html_full = true;
                 }
             }
         }

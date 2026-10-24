@@ -65,3 +65,20 @@ describe("structured data", () => {
     }
   });
 });
+
+describe("raw JSON-LD", () => {
+  it("keeps each block at its place on the page", () => {
+    const page = [
+      `{"@type":"Event","name":"A"}`,
+      `{"@type":"Event","name":"B",}`,
+      `totally broken`,
+      `{"@type":"Event","name":"C"}`,
+    ]
+      .map((b) => `<script type="application/ld+json">${b}</script>`)
+      .join("\n");
+    const lenient = extractStructured(page, { raw: true }).raw!.jsonLd;
+    expect(lenient).toEqual([{ "@type": "Event", name: "A" }, { "@type": "Event", name: "B" }, null, { "@type": "Event", name: "C" }]);
+    const strict = extractStructured(page, { raw: true, lenient: false }).raw!.jsonLd;
+    expect(strict).toEqual([{ "@type": "Event", name: "A" }, null, null, { "@type": "Event", name: "C" }]);
+  });
+});
