@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.2.0 — 2026-10-24
+
+festimap parity where `strip` cuts, block indices in `raw.jsonLd`, and size limits that hold however a page streams.
+
+- Changed: `strip`'s budgets (`maxChars`, `maxText`, `maxAttr`, `maxJsonLd`, the `data-*` limit) and `tokens` count
+  UTF-16 units, as JavaScript's `length` and festimap's `cleanForLearn` count them, not bytes or code points. Its cut
+  is now festimap's wherever it falls: a `<title>`, `<meta>` or JSON-LD block late in the page takes its room from the
+  start of the body, as festimap writes them first, and an empty wrapper dropped at the end still counts. Where
+  festimap cuts a character past U+FFFF in half it keeps a lone surrogate; pestle writes U+FFFD, the same UTF-8.
+  Held to `cleanForLearn` at budgets from 120 to 24,000 on every fixture page, with and without astral text.
+- Changed: `structured.raw.jsonLd` has one entry per JSON-LD `<script>`, in page order, so a block's index is its place
+  on the page: `null` for a block that cannot be read (it was left out, moving the ones after it), an array for
+  several values glued together in one (they were spread out).
+- Fixed: a value past a size limit could get text from after the cut spliced onto it when the page arrived in pieces:
+  an `html` field past `maxCapture` (`<div><p>…` then a later `</p>`), a JSON-LD block past `max_block_bytes`, and an
+  embedded JSON script past `max_script_bytes` (8 MiB each, Rust options), which could then read as JSON it never
+  was. Each now stops at its limit: an `html` field holds its first `maxCapture` bytes however the page streams (and no
+  longer stops the field's text), a JSON-LD block its first `max_block_bytes` (read as the truncated block it is), and
+  such a script is left out.
+- Fixed: `robots.txt` was read to 512 Ki *characters*, up to 2 MiB; it is now 512 KiB, as documented. `maxCapture`
+  cut a value's last piece by characters too, so a value could pass it.
+
 ## 0.1.0 — 2026-10-24
 
 The first release of `@pestle-rs/node` on npm: prebuilt for Linux (glibc and musl), macOS and Windows, x64 and

@@ -703,7 +703,7 @@ dependencies = [
 
 [[package]]
 name = "pestle-bench"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "lol_html",
  "pest",
@@ -717,7 +717,7 @@ dependencies = [
 
 [[package]]
 name = "pestle-grammar"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "memchr",
  "pest",
@@ -731,7 +731,7 @@ dependencies = [
 
 [[package]]
 name = "pestle-html"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "encoding_rs",
  "flate2",
@@ -749,7 +749,7 @@ dependencies = [
 
 [[package]]
 name = "pestle-node"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "mimalloc",
  "napi",
