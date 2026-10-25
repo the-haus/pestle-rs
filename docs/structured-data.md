@@ -59,7 +59,7 @@ is one event, its formats listed in `formats`.
 
 | on the page | read as |
 | --- | --- |
-| broken JSON: trailing or missing commas, comments, single quotes, unquoted keys, `True`/`None`/`NaN`, raw newlines, unescaped `"` inside text, entity-escaped or CDATA- or comment-wrapped blocks, truncated blocks, several objects glued together | the JSON meant (each repair listed in `warnings`) |
+| broken JSON: trailing or missing commas, comments, single quotes, “smart quotes”, unquoted keys and values (`url: https://…`, `width:3px`), `True`/`None`/`NaN`, raw newlines, unescaped `"` inside text, entity-escaped or CDATA- or comment-wrapped blocks, truncated blocks, several objects glued together | the JSON meant (each repair listed in `warnings`) |
 | `text/ld+json`, `application/json+ld`, a type with a charset | JSON-LD |
 | `@context` missing, `http`/`https`, trailing `/`, `schema.org`, the docs URL, `{ "@vocab": … }`; `type`/`id` without `@`; `schema:` or full-IRI names | schema.org |
 | names in the wrong case or style: `musicevent`, `Start_Date`, `door time`, `Music Event` | `MusicEvent`, `startDate`, `doorTime` |

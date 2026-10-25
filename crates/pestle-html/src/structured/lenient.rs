@@ -6,10 +6,12 @@
 //! missing commas, single-quoted strings, unquoted keys, raw newlines and
 //! control characters in strings, unknown escapes, `NaN`/`Infinity`/
 //! `undefined` (as null), hex and `+`/`.`-led numbers, Python's
-//! `True`/`False`/`None`, a `var x =` in front, several values in one block
-//! (`{…}{…}`, `{…},{…}`, `{…};`), a block whose quotes were HTML-escaped
-//! (`&quot;`), and a block cut short (open strings and brackets closed). It
-//! never fails: what cannot be read is skipped, and each repair is noted.
+//! `True`/`False`/`None`, unquoted values (`https://…`, `3px`, `2024-10-25`),
+//! “smart quotes”, a `var x =` or `window["x"] =` in front, several values in
+//! one block (`{…}{…}`, `{…},{…}`, `{…};`), a block whose quotes were
+//! HTML-escaped (`&quot;`), and a block cut short (open strings and brackets
+//! closed). It never fails, and takes time in proportion to the block: what
+//! cannot be read is skipped, and each repair is noted.
 
 use serde_json::{Map, Number, Value};
 
@@ -22,6 +24,10 @@ pub struct Read {
 
 /// Every JSON value in `text`, as leniently as it takes.
 pub fn read(text: &str) -> Read {
+    read_once(text, true)
+}
+
+fn read_once(text: &str, entities: bool) -> Read {
     let trimmed = strip_wrappers(text);
     if let Ok(v) = serde_json::from_str::<Value>(trimmed) {
         return Read {
@@ -29,11 +35,13 @@ pub fn read(text: &str) -> Read {
             repairs: Vec::new(),
         };
     }
-    // Quotes escaped as entities (`{&quot;@type&quot;: …}`): the block decoded, first.
-    if trimmed.contains("&quot;") || trimmed.contains("&#34;") {
+    // Quotes escaped as entities (`{&quot;@type&quot;: …}`): the block decoded, once, first. Only when
+    // the first quote is one and none is left raw: in `{"a": "say &quot;hi&quot;"}` they are text.
+    let opened = trimmed.trim_start_matches(|c: char| c == '{' || c == '[' || c.is_whitespace());
+    if entities && !trimmed.contains('"') && (opened.starts_with("&quot;") || opened.starts_with("&#34;")) {
         let decoded = crate::decode::text_of(trimmed.as_bytes(), true, false).into_owned();
         if decoded != trimmed {
-            let mut again = read(&decoded);
+            let mut again = read_once(&decoded, false);
             if !again.values.is_empty() {
                 again.repairs.push("html entities");
                 return again;
@@ -76,6 +84,9 @@ fn strip_wrappers(text: &str) -> &str {
 }
 
 const MAX_DEPTH: usize = 256;
+
+const LEFT_QUOTE: &[u8] = "\u{201C}".as_bytes();
+const RIGHT_QUOTE: &[u8] = "\u{201D}".as_bytes();
 
 struct Lenient<'a> {
     s: &'a [u8],
@@ -151,10 +162,15 @@ impl Lenient<'_> {
                     self.i += 1;
                 }
                 _ if is_ident_start(b) => {
-                    // `var data = {…}`, `window.x = […]`: what follows the `=`.
+                    // `var data = {…}`, `window.x = […]`, `window["x"] = {…}`: what follows the `=`.
                     let start = self.i;
-                    while self.peek().is_some_and(|b| is_ident(b) || b == b'.' || b == b' ') {
-                        self.i += 1;
+                    loop {
+                        while self.peek().is_some_and(|b| is_ident(b) || b == b'.' || b == b' ') {
+                            self.i += 1;
+                        }
+                        if !self.subscript() {
+                            break;
+                        }
                     }
                     if self.peek() == Some(b'=') {
                         self.note("assignment");
@@ -174,10 +190,33 @@ impl Lenient<'_> {
                 }
             }
         }
+        // Beside an object or array, a number or string at the top is script around it
+        // (`"use strict";`, `x = 5;`), not data.
+        if out.iter().any(|v| v.is_object() || v.is_array()) {
+            out.retain(|v| v.is_object() || v.is_array());
+        }
         if out.len() > 1 {
             self.note("several values");
         }
         out
+    }
+
+    /// At `["x"]` or `['x']` right after a name: past it.
+    fn subscript(&mut self) -> bool {
+        let rest = &self.s[self.i..];
+        let Some(&q @ (b'"' | b'\'')) = rest.get(1) else {
+            return false;
+        };
+        if rest[0] != b'[' {
+            return false;
+        }
+        match memchr::memchr(q, &rest[2..]) {
+            Some(e) if rest.get(e + 3) == Some(&b']') => {
+                self.i += e + 4;
+                true
+            }
+            _ => false,
+        }
     }
 
     fn value(&mut self) -> Option<Value> {
@@ -187,9 +226,18 @@ impl Lenient<'_> {
             b'{' => self.object(),
             b'[' => self.array(),
             b'"' | b'\'' => Some(Value::String(self.string(b))),
-            b'-' | b'+' | b'.' | b'0'..=b'9' => Some(self.number()),
+            b'-' | b'+' | b'.' | b'0'..=b'9' => self.number(),
+            // The end of the value's container, or of a missing value: left for the container.
+            b'}' | b']' | b',' | b':' => None,
+            _ if self.s[self.i..].starts_with(LEFT_QUOTE) => Some(Value::String(self.smart_quoted())),
             _ if is_ident_start(b) => {
+                let start = self.i;
                 let word = self.ident();
+                if self.s[self.i..].starts_with(b"://") {
+                    // `url: https://x.com/a`: a URL someone forgot to quote, to where it ends.
+                    self.note("unquoted string");
+                    return Some(Value::String(self.bare(start)));
+                }
                 Some(match word.as_str() {
                     "true" | "True" => Value::Bool(true),
                     "false" | "False" => Value::Bool(false),
@@ -255,13 +303,14 @@ impl Lenient<'_> {
                     }
                     self.string(q)
                 }
+                Some(_) if self.s[self.i..].starts_with(LEFT_QUOTE) => self.smart_quoted(),
                 Some(b) if is_ident_start(b) || b == b'@' || b.is_ascii_digit() => {
                     self.note("unquoted keys");
                     let start = self.i;
-                    // `schema:name` is one key; in `b: "x"` the colon separates.
+                    // `schema:name: "x"` is one key; in `b: "x"` and `b:1` the colon separates.
                     while let Some(b) = self.peek() {
-                        let compact = b == b':' && self.s.get(self.i + 1).is_some_and(|&n| is_ident(n));
-                        if !(is_ident(b) || b == b'@' || b == b'-' || compact) {
+                        let compact = b == b':' && self.compact_key_colon();
+                        if !(is_ident(b) || matches!(b, b'@' | b'-' | b'.') || compact) {
                             break;
                         }
                         self.i += 1;
@@ -364,7 +413,7 @@ impl Lenient<'_> {
             };
             if b == quote {
                 // `"The "Best" Night"`: a quote followed, on the same line, by more than the end of a
-                // value (`,` `:` `}` `]`, another string) is part of the text.
+                // value (`,` `:` `}` `]` `;` `)`, another string, a comment) is part of the text.
                 let mut j = self.i + 1;
                 let mut newline = false;
                 while let Some(&w) = self.s.get(j) {
@@ -377,7 +426,7 @@ impl Lenient<'_> {
                 let ends = newline
                     || matches!(
                         self.s.get(j),
-                        None | Some(b',' | b':' | b'}' | b']' | b'"' | b'\'' | b'/')
+                        None | Some(b',' | b':' | b'}' | b']' | b'"' | b'\'' | b'/' | b';' | b')')
                     );
                 if ends {
                     out.push_str(&self.src[from..self.i]);
@@ -412,9 +461,10 @@ impl Lenient<'_> {
                 b'u' => out.push(self.unicode_escape()),
                 b'x' => {
                     let hex = self
-                        .src
+                        .s
                         .get(self.i..self.i + 2)
-                        .and_then(|h| u8::from_str_radix(h, 16).ok());
+                        .filter(|h| h.iter().all(u8::is_ascii_hexdigit))
+                        .and_then(|h| u8::from_str_radix(std::str::from_utf8(h).ok()?, 16).ok());
                     match hex {
                         Some(v) => {
                             out.push(v as char);
@@ -437,8 +487,11 @@ impl Lenient<'_> {
     }
 
     fn hex4(&mut self) -> Option<u32> {
-        let h = self.src.get(self.i..self.i + 4)?;
-        let v = u32::from_str_radix(h, 16).ok()?;
+        let h = self.s.get(self.i..self.i + 4)?;
+        if !h.iter().all(u8::is_ascii_hexdigit) {
+            return None;
+        }
+        let v = u32::from_str_radix(std::str::from_utf8(h).ok()?, 16).ok()?;
         self.i += 4;
         Some(v)
     }
@@ -458,11 +511,14 @@ impl Lenient<'_> {
         char::from_u32(hi).unwrap_or('\u{FFFD}')
     }
 
-    fn number(&mut self) -> Value {
+    /// A number, a bare token that starts like one (`3px`, `2024-10-25`, `10:30`) as a string,
+    /// or nothing when no digit follows (`-`, `.`), left where it stands.
+    fn number(&mut self) -> Option<Value> {
         let start = self.i;
         if matches!(self.peek(), Some(b'+' | b'-')) {
             self.i += 1;
         }
+        let neg = self.s[start] == b'-';
         if self.s[self.i..].starts_with(b"0x") || self.s[self.i..].starts_with(b"0X") {
             self.i += 2;
             let hs = self.i;
@@ -470,14 +526,25 @@ impl Lenient<'_> {
                 self.i += 1;
             }
             self.note("non-JSON numbers");
-            let v = i64::from_str_radix(&self.src[hs..self.i], 16).unwrap_or(0);
-            let neg = self.s[start] == b'-';
-            return Value::Number(Number::from(if neg { -v } else { v }));
+            let digits = &self.src[hs..self.i];
+            if digits.is_empty() {
+                return Some(Value::Number(0.into()));
+            }
+            return Some(match i64::from_str_radix(digits, 16) {
+                Ok(v) => Value::Number(Number::from(if neg { -v } else { v })),
+                // Past i64: as near as a float comes.
+                Err(_) => {
+                    let v = digits
+                        .bytes()
+                        .fold(0f64, |n, d| n * 16.0 + f64::from((d as char).to_digit(16).unwrap_or(0)));
+                    Number::from_f64(if neg { -v } else { v }).map_or(Value::Null, Value::Number)
+                }
+            });
         }
         if self.s[self.i..].starts_with(b"Infinity") {
             self.i += 8;
             self.note("non-JSON literal");
-            return Value::Null;
+            return Some(Value::Null);
         }
         while self
             .peek()
@@ -490,22 +557,88 @@ impl Lenient<'_> {
             }
             self.i += 1;
         }
-        let text = self.src[start..self.i].trim_start_matches('+');
-        if let Ok(v) = serde_json::from_str::<Value>(text) {
-            return v;
+        if !self.s[start..self.i].iter().any(u8::is_ascii_digit) {
+            self.i = start;
+            return None;
         }
-        self.note("non-JSON numbers");
-        let fixed = text.trim_end_matches('.');
-        let fixed = if fixed.starts_with('.') {
-            format!("0{fixed}")
-        } else {
-            fixed.replace("-.", "-0.")
-        };
-        fixed
-            .parse::<f64>()
-            .ok()
-            .and_then(Number::from_f64)
-            .map_or_else(|| Value::String(text.to_owned()), Value::Number)
+        let digit_next = self.s.get(self.i + 1).is_some_and(u8::is_ascii_digit);
+        match self.peek() {
+            Some(b) if b.is_ascii_alphanumeric() || b == b'_' || b >= 0x80 => {}
+            Some(b'-' | b':' | b'/') if digit_next => {}
+            _ => {
+                let text = self.src[start..self.i].trim_start_matches('+');
+                if let Ok(v) = serde_json::from_str::<Value>(text) {
+                    return Some(v);
+                }
+                self.note("non-JSON numbers");
+                let fixed = text.trim_end_matches('.');
+                let fixed = if fixed.starts_with('.') {
+                    format!("0{fixed}")
+                } else {
+                    fixed.replace("-.", "-0.")
+                };
+                return Some(
+                    fixed
+                        .parse::<f64>()
+                        .ok()
+                        .and_then(Number::from_f64)
+                        .map_or_else(|| Value::String(text.to_owned()), Value::Number),
+                );
+            }
+        }
+        self.note("unquoted string");
+        Some(Value::String(self.bare(start)))
+    }
+
+    /// An unquoted token from `start` to where a value ends: whitespace, a separator, a quote.
+    fn bare(&mut self, start: usize) -> String {
+        while self
+            .peek()
+            .is_some_and(|b| !b.is_ascii_whitespace() && !matches!(b, b',' | b'}' | b']' | b'"' | b'\'' | b';' | b')'))
+        {
+            self.i += 1;
+        }
+        self.src[start..self.i].to_owned()
+    }
+
+    /// `“text”`, as a word processor or CMS writes quotes: the text between them.
+    fn smart_quoted(&mut self) -> String {
+        self.note("smart quotes");
+        self.i += LEFT_QUOTE.len();
+        let from = self.i;
+        match memchr::memmem::find(&self.s[from..], RIGHT_QUOTE) {
+            Some(e) => {
+                self.i = from + e + RIGHT_QUOTE.len();
+                self.src[from..from + e].to_owned()
+            }
+            None => {
+                self.note("truncated");
+                self.i = self.s.len();
+                self.src[from..].to_owned()
+            }
+        }
+    }
+
+    /// At a colon inside an unquoted key: whether it joins the key, as in
+    /// `schema:name: "x"`, rather than ending it, as in `a:1` — only when
+    /// another colon (or `=`) follows the name after it.
+    fn compact_key_colon(&self) -> bool {
+        let mut j = self.i + 1;
+        if !self.s.get(j).is_some_and(|&b| is_ident(b)) {
+            return false;
+        }
+        while self.s.get(j).is_some_and(|&b| is_ident(b) || b == b'@' || b == b'-') {
+            j += 1;
+        }
+        while self.s.get(j).is_some_and(u8::is_ascii_whitespace) {
+            j += 1;
+        }
+        // Not `url:https://…`, where the second colon is a URL's.
+        match self.s.get(j) {
+            Some(b':') => self.s.get(j + 1) != Some(&b'/'),
+            Some(b'=') => true,
+            _ => false,
+        }
     }
 
     fn ident(&mut self) -> String {
@@ -582,6 +715,20 @@ mod tests {
     }
 
     #[test]
+    fn unquoted_keys_with_no_space_after_the_colon() {
+        assert_eq!(
+            one("{a:1, b:true, c:null, d:x, e:\"y\", f:-2}"),
+            json!({ "a": 1, "b": true, "c": null, "d": "x", "e": "y", "f": -2 })
+        );
+        assert_eq!(one("{schema:name: \"Nora\"}"), json!({ "schema:name": "Nora" }));
+        assert_eq!(
+            one("{schema:name:\"Nora\", og:url :1}"),
+            json!({ "schema:name": "Nora", "og:url": 1 })
+        );
+        assert_eq!(one("{a:b:c:1}"), json!({ "a:b:c": 1 }));
+    }
+
+    #[test]
     fn several_values_in_one_block() {
         let r = read("{\"a\": 1}\n{\"b\": 2}");
         assert_eq!(r.values, [json!({ "a": 1 }), json!({ "b": 2 })]);
@@ -596,5 +743,349 @@ mod tests {
         assert!(read("}}}]]] ::: ''").values.len() <= 1);
         let deep = "[".repeat(10_000);
         assert!(read(&deep).values.len() <= 1);
+    }
+
+    #[test]
+    fn a_missing_value_leaves_its_container_closed() {
+        assert_eq!(one("{\"a\": }"), json!({ "a": null }));
+        assert_eq!(
+            read("{\"a\": } {\"b\": 1}").values,
+            [json!({ "a": null }), json!({ "b": 1 })]
+        );
+        assert_eq!(one("{\"a\":, \"b\": 1}"), json!({ "a": null, "b": 1 }));
+        assert_eq!(one("{\"a\": [1, ], \"b\": 2}"), json!({ "a": [1], "b": 2 }));
+        assert_eq!(one("{\"a\": ]"), json!({ "a": null }));
+        assert_eq!(one("[1, -, 2]"), json!([1, 2]));
+        assert_eq!(one("[., 1]"), json!([1]));
+    }
+
+    #[test]
+    fn bare_values() {
+        assert_eq!(
+            one("{url: https://x.com/a?b=1, b:2}"),
+            json!({ "url": "https://x.com/a?b=1", "b": 2 })
+        );
+        assert_eq!(one("{url:https://x.com}"), json!({ "url": "https://x.com" }));
+        assert_eq!(
+            one("{w: 3px, d: 2024-10-25, t: 10:30, r: 1/2, n: 1e3}"),
+            json!({ "w": "3px", "d": "2024-10-25", "t": "10:30", "r": "1/2", "n": 1000.0 })
+        );
+        assert_eq!(one("{og.title: 1}"), json!({ "og.title": 1 }));
+    }
+
+    #[test]
+    fn numbers() {
+        assert_eq!(
+            one("[0xFFFFFFFFFFFFFFFFFF, -0x10, 0x]"),
+            json!([4.722366482869645e21, -16, 0])
+        );
+        assert_eq!(
+            one("[-Infinity, +Infinity, 1., -.5, 01, 1.2.3]"),
+            json!([null, null, 1.0, -0.5, 1.0, "1.2.3"])
+        );
+        assert_eq!(one("{\"a\": 5e, \"b\": 1}"), json!({ "a": "5e", "b": 1 }));
+    }
+
+    #[test]
+    fn escapes() {
+        assert_eq!(
+            one("{\"a\": \"\\x41\\x+1\\u+041\\u12\", b:1}"),
+            json!({ "a": "Ax+1u+041u12", "b": 1 })
+        );
+        assert_eq!(one("{\"a\": \"\\ud83c\", b:1}"), json!({ "a": "\u{FFFD}", "b": 1 }));
+        assert_eq!(one("{\"a\": \"\\é\\q\", b:1}"), json!({ "a": "éq", "b": 1 }));
+        assert_eq!(one("{\"a\": \"x\\"), json!({ "a": "x" }));
+    }
+
+    #[test]
+    fn smart_quotes() {
+        assert_eq!(
+            one("{\u{201C}name\u{201D}: \u{201C}Nora \"live\"\u{201D}, \u{201C}x\u{201D}: 1}"),
+            json!({ "name": "Nora \"live\"", "x": 1 })
+        );
+        assert_eq!(one("{\u{201C}a\u{201D}: \u{201C}cut"), json!({ "a": "cut" }));
+    }
+
+    #[test]
+    fn script_around_the_data() {
+        assert_eq!(
+            read("\"use strict\"; var x = 5; var data = {\"a\": 1};").values,
+            [json!({ "a": 1 })]
+        );
+        assert_eq!(read("window[\"__DATA__\"] = {\"a\": 1}").values, [json!({ "a": 1 })]);
+        assert_eq!(read("window['x'].y = [1]").values, [json!([1])]);
+        assert_eq!(read("cb({\"a\": 1});").values, [json!({ "a": 1 })]);
+        assert_eq!(read("\"just a string\"; junk").values, [json!("just a string")]);
+    }
+
+    #[test]
+    fn entities() {
+        // Text that holds entities beside raw quotes keeps them.
+        assert_eq!(
+            one("{\"a\": \"say &quot;hi&quot;\",}"),
+            json!({ "a": "say &quot;hi&quot;" })
+        );
+        // Decoded once: a chain of `&amp;` is not followed down, however long.
+        let deep = format!("{{&quot;a&quot;: &{}quot;x&quot;}}", "amp;".repeat(200_000));
+        let r = read(&deep);
+        assert_eq!(r.values.len(), 1);
+        assert!(r.values[0].get("a").is_some());
+        // Single-quoted text that holds one is not decoded either.
+        assert_eq!(one("{'a': '&quot;x', }"), json!({ "a": "&quot;x" }));
+    }
+
+    /// A small, fixed random source, so a failure reproduces.
+    struct Rng(u64);
+
+    impl Rng {
+        fn next(&mut self) -> u64 {
+            self.0 ^= self.0 << 13;
+            self.0 ^= self.0 >> 7;
+            self.0 ^= self.0 << 17;
+            self.0
+        }
+        fn below(&mut self, n: usize) -> usize {
+            (self.next() % n as u64) as usize
+        }
+        fn chance(&mut self, in_n: usize) -> bool {
+            self.below(in_n) == 0
+        }
+    }
+
+    fn text(r: &mut Rng) -> String {
+        const PIECES: &[&str] = &[
+            "a", "Nora", " ", "'", "\"", "\\", "/", "//", "/*", "*/", "{", "}", "[", "]", ",", ":", "é", "🎸", "\n",
+            "\t", "&quot;", "<!--", "-->", "]]>", "\u{201C}", "\u{201D}", "1", "-", "http://", "\u{a0}", "\u{2028}",
+        ];
+        (0..r.below(6)).map(|_| PIECES[r.below(PIECES.len())]).collect()
+    }
+
+    fn key(r: &mut Rng) -> String {
+        const KEYS: &[&str] = &[
+            "a",
+            "name",
+            "@type",
+            "schema:name",
+            "$x",
+            "_y",
+            "startDate",
+            "og.title",
+            "url",
+        ];
+        if r.chance(3) {
+            text(r)
+        } else {
+            KEYS[r.below(KEYS.len())].to_owned()
+        }
+    }
+
+    fn value(r: &mut Rng, depth: usize) -> serde_json::Value {
+        use serde_json::Value;
+        match r.below(if depth > 4 { 5 } else { 7 }) {
+            0 => Value::Null,
+            1 => Value::Bool(r.chance(2)),
+            2 => json!(r.next() as i64 >> r.below(64)),
+            3 => serde_json::Number::from_f64((r.next() % 100_000) as f64 / 64.0).map_or(Value::Null, Value::Number),
+            4 => Value::String(text(r)),
+            5 => Value::Array((0..r.below(4)).map(|_| value(r, depth + 1)).collect()),
+            _ => Value::Object((0..r.below(4)).map(|_| (key(r), value(r, depth + 1))).collect()),
+        }
+    }
+
+    /// Between tokens: nothing, space, a line break or a comment.
+    fn gap(r: &mut Rng, out: &mut String) {
+        match r.below(8) {
+            0 => out.push(' '),
+            1 => out.push('\n'),
+            2 => out.push_str(" /* c */ "),
+            3 => out.push_str(" // c\n"),
+            _ => {}
+        }
+    }
+
+    fn plain(s: &str, quote: char) -> bool {
+        !s.chars().any(|c| c == quote || c == '\\' || c < ' ' || c == '\u{2028}')
+    }
+
+    /// `v` written as sites write it: quotes of either kind or none, Python literals, comments,
+    /// commas trailing or left out.
+    fn sloppy(r: &mut Rng, v: &serde_json::Value, out: &mut String) {
+        use serde_json::Value;
+        match v {
+            Value::Null if r.chance(3) => out.push_str("None"),
+            Value::Bool(b) if r.chance(3) => out.push_str(if *b { "True" } else { "False" }),
+            Value::Number(n) if r.chance(3) && n.as_f64().is_some_and(|f| f >= 0.0) => {
+                out.push('+');
+                out.push_str(&n.to_string());
+            }
+            Value::String(s) => string(r, s, out),
+            Value::Array(items) => {
+                out.push('[');
+                for (k, item) in items.iter().enumerate() {
+                    gap(r, out);
+                    sloppy(r, item, out);
+                    gap(r, out);
+                    if k + 1 < items.len() || r.chance(3) {
+                        out.push(',');
+                    }
+                }
+                out.push(']');
+            }
+            Value::Object(map) => {
+                out.push('{');
+                let bare: Vec<bool> = map
+                    .keys()
+                    .map(|key| {
+                        key.bytes()
+                            .next()
+                            .is_some_and(|b| b.is_ascii_alphabetic() || b"@$_".contains(&b))
+                            && key.bytes().all(|b| b.is_ascii_alphanumeric() || b"@$_:.".contains(&b))
+                            && !key.ends_with(':')
+                            && !key.contains("::")
+                            && r.chance(2)
+                    })
+                    .collect();
+                for (k, (key, item)) in map.iter().enumerate() {
+                    gap(r, out);
+                    if bare[k] {
+                        out.push_str(key);
+                    } else {
+                        string(r, key, out);
+                    }
+                    if r.chance(2) {
+                        out.push(' ');
+                    }
+                    out.push(':');
+                    if r.chance(2) {
+                        out.push(' ');
+                    }
+                    sloppy(r, item, out);
+                    gap(r, out);
+                    // A comma left out only before a quoted key, where nothing else can be meant.
+                    if k + 1 < map.len() && !bare[k + 1] && r.chance(4) {
+                        out.push(' ');
+                    } else if k + 1 < map.len() || r.chance(3) {
+                        out.push(',');
+                    }
+                }
+                out.push('}');
+            }
+            _ => out.push_str(&v.to_string()),
+        }
+    }
+
+    fn string(r: &mut Rng, s: &str, out: &mut String) {
+        if plain(s, '\'') && r.chance(3) {
+            out.push('\'');
+            out.push_str(s);
+            out.push('\'');
+        } else {
+            out.push_str(&serde_json::Value::String(s.to_owned()).to_string());
+        }
+    }
+
+    #[test]
+    fn what_is_written_sloppily_reads_back_exactly() {
+        let mut r = Rng(0x5eed_1234_abcd_0001);
+        for n in 0..20_000 {
+            let v = if r.chance(2) {
+                serde_json::Value::Object((0..1 + r.below(4)).map(|_| (key(&mut r), value(&mut r, 1))).collect())
+            } else {
+                serde_json::Value::Array((0..1 + r.below(4)).map(|_| value(&mut r, 1)).collect())
+            };
+            let mut s = String::new();
+            sloppy(&mut r, &v, &mut s);
+            let got = read(&s);
+            assert_eq!(got.values, std::slice::from_ref(&v), "case {n}: {s:?}");
+        }
+    }
+
+    #[test]
+    fn never_panics() {
+        let mut r = Rng(0x0dd_ba11_cafe_f00d);
+        // Every prefix of sloppy text: a block cut short anywhere.
+        for _ in 0..300 {
+            let v = value(&mut r, 0);
+            let mut s = String::new();
+            sloppy(&mut r, &v, &mut s);
+            for (at, _) in s.char_indices() {
+                read(&s[..at]);
+            }
+        }
+        // Soup of the pieces that steer the parser.
+        const SOUP: &[&str] = &[
+            "{",
+            "}",
+            "[",
+            "]",
+            ",",
+            ":",
+            ";",
+            "=",
+            "\"",
+            "'",
+            "\\",
+            "\\u",
+            "\\ud83c",
+            "\\x4",
+            "/",
+            "//",
+            "/*",
+            "*/",
+            "<!--",
+            "-->",
+            "<![CDATA[",
+            "]]>",
+            "0x",
+            "-",
+            "+",
+            ".",
+            "e",
+            "1",
+            "Infinity",
+            "NaN",
+            "true",
+            "a",
+            "@",
+            "schema:",
+            "http://",
+            "&quot;",
+            "&amp;",
+            "\u{201C}",
+            "\u{201D}",
+            "é",
+            "\u{feff}",
+            "\u{a0}",
+            "\n",
+            " ",
+            "window[\"x\"]",
+            "var x =",
+            "(",
+            ")",
+        ];
+        for _ in 0..30_000 {
+            let s: String = (0..r.below(40)).map(|_| SOUP[r.below(SOUP.len())]).collect();
+            read(&s);
+        }
+    }
+
+    #[test]
+    fn hostile_blocks_stay_linear() {
+        // Each of these, quadratic or recursive, would take minutes or overflow the stack.
+        for s in [
+            "{".repeat(200_000),
+            "[".repeat(200_000) + &"]".repeat(200_000),
+            "\"a\" ".repeat(200_000),
+            format!("{{\"a\": \"{}", "\" x".repeat(200_000)),
+            format!("{{{}1}}", "a:".repeat(200_000)),
+            "/*".repeat(200_000),
+            "{a:b:".repeat(100_000),
+            "x = ".repeat(200_000),
+            "window[\"".repeat(100_000),
+            "\u{201C}".repeat(200_000),
+            "1-".repeat(200_000),
+        ] {
+            read(&s);
+        }
     }
 }
