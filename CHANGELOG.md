@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.2.1 — 2026-10-25
+
+Broken JSON-LD and embedded JSON read as meant in more of the ways sites break it, and never at a cost out of
+proportion to the block.
+
+- Fixed: an unquoted key with no space after its colon lost its value when the value was not quoted: `{a:1}` read as
+  `{"a:1": null}`. A colon joins an unquoted key only when another colon follows (`schema:name: …`), and not a URL's.
+- Fixed: a key with no value (`{"a": }`) took its object's closing brace with it, and with that everything after it.
+- Fixed: a block whose quotes are entities (`{&quot;@type&quot;: …}`) is decoded once, and only when its first quote is
+  one: a long chain of `&amp;amp;…` could overflow the stack, and `&quot;` in the text of a block with real quotes
+  was decoded into it.
+- Fixed: `window["x"] = {…}`, `"use strict";` or `x = 5;` around a block no longer give a stray first value, which
+  embedded JSON took in place of the block's data.
+- Fixed: a hex number past 64 bits read as `0` (now the nearest float); `\u` and `\x` escapes took a `+` as a digit; a
+  lone `-` or `.` read as a string.
+- Added: unquoted values are read as strings, whole: `url: https://…`, `width: 3px`, `date: 2024-10-25`, `10:30`; so
+  are “smart quotes” from word processors and CMSs, and dotted unquoted keys (`og.title`).
+- Tested by reading back random values written the ways sites write them (either quotes or none, comments, trailing
+  and missing commas, Python literals), every prefix of such text, random token soup, and hostile blocks.
+
 ## 0.2.0 — 2026-10-24
 
 festimap parity where `strip` cuts, block indices in `raw.jsonLd`, and size limits that hold however a page streams.

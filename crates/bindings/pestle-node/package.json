@@ -1,6 +1,6 @@
 {
   "name": "@pestle-rs/node",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Fast streaming HTML extraction for scrapers and AI agents in Node.js: CSS selectors, page metadata, links, embedded JSON, JSON-LD, microdata, RDFa and microformats, accessibility snapshots, robots.txt and sitemaps, in one pass and any charset (Rust, N-API).",
   "license": "MIT OR Apache-2.0",
   "packageManager": "yarn@4.5.1",
