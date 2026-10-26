@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.4.0 — 2026-10-26
 
 What festimap's site crawler still did around pestle: fields matched in the page's context, values read from above a
 row, a page's text as lines, registrable domains, and which JSON-LD block was repaired.
