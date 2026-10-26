@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.3.0 — 2026-10-26
+
+A site's routes from its URLs: which of them are its events, products or articles.
 
 - Added: a site's routes from its URLs, `inferRoutes(urls)` (Node) and `routes::RouteBuilder` (Rust): the tree of
   patterns its pages follow, as Next.js writes them (`/agenda/[slug]`, `/news/[year]/[month]/[slug]`,

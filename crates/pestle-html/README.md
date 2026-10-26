@@ -55,7 +55,7 @@ Not on crates.io yet:
 
 ```toml
 [dependencies]
-pestle-html = { git = "https://github.com/the-haus/pestle-rs", tag = "v0.2.1" }
+pestle-html = { git = "https://github.com/the-haus/pestle-rs", tag = "v0.3.0" }
 ```
 
 ## License

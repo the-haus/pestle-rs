@@ -9,15 +9,15 @@ resolver = "2"
 
 [workspace.package]
 edition = "2021"
-version = "0.2.1"
+version = "0.3.0"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/the-haus/pestle-rs"
 rust-version = "1.87"
 
 [workspace.dependencies]
 # Internal crates.
-pestle-grammar = { path = "crates/pestle-grammar", version = "=0.2.1" }
-pestle-html = { path = "crates/pestle-html", version = "=0.2.1" }
+pestle-grammar = { path = "crates/pestle-grammar", version = "=0.3.0" }
+pestle-html = { path = "crates/pestle-html", version = "=0.3.0" }
 
 # External crates.
 pest = "2.9.4"
