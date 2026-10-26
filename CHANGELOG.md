@@ -1,5 +1,33 @@
 # Changelog
 
+## Unreleased
+
+What festimap's site crawler still did around pestle: fields matched in the page's context, values read from above a
+row, a page's text as lines, registrable domains, and which JSON-LD block was repaired.
+
+- Changed: a field's selector under a scope picks elements under the scope, each matched in the page's context, as
+  the DOM's `element.querySelectorAll` (and css-select with `relativeSelector: false`) matches: under a `.card`,
+  `.card h3` is the card's `h3` (it was nothing: `a b` read as `:scope a b`), and `section b` under an `li` inside a
+  `section` is the `li`'s `b`. `:scope h3` keeps to the scope, `> li` is still its children, and inside `:has()` a
+  selector stays relative to the element tested. A spec whose selectors under a scope name an ancestor of it can
+  now match more; wrapping them in `:is(…)` is no longer needed. Held to css-select by the differential tests.
+- Changed: the warnings of a JSON-LD block name it by its index in `raw.jsonLd`: `json-ld[1]: trailing commas`,
+  `json-ld[0]: a block was left out: …`, `json-ld[2]: a block was cut at max_block_bytes`; `raw.jsonLdRepaired` lists
+  the blocks that were repaired. Other passes' warnings are as they were.
+- Added: `closest` on a field under a scope (`true`, or `{ depth }`, 8 levels by default): when nothing under the scope
+  has a value, the scope's ancestors are read, nearest first: in each the first match under it, else the ancestor
+  itself. For a day or a stage a timetable states once above its rows (`<section data-day>` around the list, an
+  `<h3>` beside it). Rows wait, in their place, for the ancestor that settles them to close, streamed or not; the
+  page's candidates are dropped as each element closes, so a long page keeps little.
+- Added: `text: "lines"`, visible text with a newline where a block (a heading, a paragraph, a list item, a table
+  row) or a `<br>` breaks it, and `page: { text: true }`: the whole page's text so, from the page pass
+  (`maxTextBytes`, 4 MiB).
+- Added: `registrableDomain(host)` and `publicSuffix(host)` (Node; `psl` in Rust) by the bundled Public Suffix List,
+  ICANN and private sections (`foo.github.io` is its own site), its date in `PUBLIC_SUFFIX_LIST_VERSION`. IDNs come
+  back as punycode, an IP address and a host that is itself a suffix are their own domain. Tested on the list's own
+  test file.
+- Added: `select: "section@data-day"` reads an attribute in a field's object as it does in the string shorthand.
+
 ## 0.3.0 — 2026-10-26
 
 A site's routes from its URLs: which of them are its events, products or articles.

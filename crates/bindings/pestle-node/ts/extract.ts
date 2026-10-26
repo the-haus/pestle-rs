@@ -29,7 +29,11 @@ export interface ParseSpec {
 
 /** One field: where its value is and how it is read. */
 export interface FieldSpec {
-  /** A CSS selector, relative to the field's scope; absent: the scope element itself. */
+  /**
+   * A CSS selector: the elements under the field's scope, each matched in the page's context, as
+   * `element.querySelectorAll` matches (`.card h3` under a `.card` is its `h3`); `:scope h3` keeps
+   * to the scope, `> h3` is its children. Absent: the scope element itself.
+   */
   select?: string;
   /** Every match (an array), not only the first with a value. */
   all?: boolean;
@@ -37,8 +41,12 @@ export interface FieldSpec {
   limit?: number;
   /** Read this attribute instead of the text. */
   attr?: string;
-  /** `visible` (default: as a reader sees it), `raw` (all text as is, scripts' too), `own` (the element's own text only). */
-  text?: "visible" | "raw" | "own";
+  /**
+   * `visible` (default: as a reader sees it), `lines` (visible, a line per block: a heading, a
+   * paragraph, a list item, a table row, a `<br>`), `raw` (all text as is, scripts' too), `own`
+   * (the element's own text only).
+   */
+  text?: "visible" | "lines" | "raw" | "own";
   /** Read the element's outer HTML. */
   html?: boolean;
   /** `true` when something matches, else `false`. */
@@ -59,6 +67,13 @@ export interface FieldSpec {
   parse?: string | ParseSpec;
   /** An object per match, its fields relative to the match. */
   fields?: Record<string, Field>;
+  /**
+   * Under a scope: when nothing under it has a value, try the scope's ancestors, nearest first
+   * (each: the first match under it, as its `querySelector` finds it, else the ancestor itself)
+   * up to `depth` levels (8). For what a timetable states once above its rows: a day, a stage.
+   * The object waits until the ancestor that settles it has closed.
+   */
+  closest?: boolean | { depth?: number };
   /** The value when nothing matched. */
   default?: unknown;
   /** Top-level, with `all`: hand items over as they complete (see {@link ExtractSession.take}) instead of keeping them. */
@@ -201,8 +216,10 @@ export interface Structured {
     microdata: unknown;
     rdfa: unknown[];
     microformats: unknown;
+    /** The indices in `jsonLd` of the blocks that had to be repaired to be read. */
+    jsonLdRepaired: number[];
   };
-  /** What was repaired or cut (`json-ld: trailing commas`). */
+  /** What was repaired or cut, a JSON-LD block's by its index in `raw.jsonLd` (`json-ld[1]: trailing commas`). */
   warnings: string[];
 }
 
@@ -325,6 +342,10 @@ export interface PageOptions {
   maxEmbedded?: number;
   /** The most characters a link's or heading's text keeps (240). */
   maxText?: number;
+  /** Also the page's visible text, a line per block ({@link Page.text}; false). */
+  text?: boolean;
+  /** The most bytes {@link Page.text} holds (4 MiB). */
+  maxTextBytes?: number;
 }
 
 /** What a scraper wants of any page. Every URL is absolute (against `<base href>`); links and images are http(s), without `#…`. */
@@ -368,6 +389,13 @@ export interface Page {
   phones?: string[];
   /** JSON in scripts, by where it was (`__NEXT_DATA__`, `window.__INITIAL_STATE__`, `application/json`). */
   embedded?: { name: string; value: unknown }[];
+  /**
+   * With {@link PageOptions.text}: the text a reader sees, a line per block (a heading, a
+   * paragraph, a list item, a table row) or `<br>`, spaces in a line collapsed, nothing of the
+   * `<head>`, scripts, styles, `<template>` and `<noscript>`. For a model's prompt, and to find a
+   * quote in that never runs across two blocks.
+   */
+  text?: string;
   /** A bot wall instead of the page: `cloudflare`, `datadome`, `perimeterx`, `incapsula`, `akamai`, `captcha`. */
   blocked?: string;
   /** What was cut at a limit. */

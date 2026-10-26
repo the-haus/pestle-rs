@@ -83,8 +83,11 @@ export {
 } from "./extract.js";
 export {
   NotASitemap,
+  PUBLIC_SUFFIX_LIST_VERSION,
   parseRobots,
   parseSitemap,
+  publicSuffix,
+  registrableDomain,
   readSitemap,
   readSitemapAsync,
   Robots,

@@ -148,11 +148,11 @@ all of it (`cargo run -p pestle-html --example quickstart`); see also
 
 | | | |
 | --- | --- | --- |
-| **Spec fields** | CSS selectors → text, attributes, HTML, URLs, numbers, JSON, regexes; nested objects; items emitted as they close | [docs/spec.md](docs/spec.md) |
+| **Spec fields** | CSS selectors → text (or text as lines), attributes, HTML, URLs, numbers, JSON, regexes; nested objects; values stated once above the rows (`closest`); items emitted as they close | [docs/spec.md](docs/spec.md) |
 | **Page** | title, description, language, canonical, robots, refresh, every meta, alternates, feeds, calendars, icons, pagination, links with text, lazy images, headings, frames, e-mail, phone, embedded script JSON, bot walls | [docs/page.md](docs/page.md) |
 | **Structured data** | JSON-LD, microdata, RDFa (OpenGraph, Dublin Core), microformats2 and classic, as one list of JSON-LD items plus a flat events view; W3C-conformant in strict mode | [docs/structured-data.md](docs/structured-data.md) |
 | **Accessibility** | Playwright's `ariaSnapshot()` in default and `ai` modes, refs with CSS selectors, hidden text filtered | [docs/aria.md](docs/aria.md) |
-| **Crawling** | robots.txt (RFC 9309, Google's leniency), sitemaps (indexes, gzip, text, RSS/Atom), streamed; a site's routes from its URLs (`/agenda/[slug]`, with counts, and which hold its items) | [docs/crawling.md](docs/crawling.md) |
+| **Crawling** | robots.txt (RFC 9309, Google's leniency), sitemaps (indexes, gzip, text, RSS/Atom), streamed; a site's routes from its URLs (`/agenda/[slug]`, with counts, and which hold its items); registrable domains by the Public Suffix List | [docs/crawling.md](docs/crawling.md) |
 | **Charsets** | every WHATWG encoding, found as browsers find it, streaming | [docs/page.md#charsets](docs/page.md#charsets) |
 | **For models** | festimap's `cleanForLearn` (a page within a token budget), template fingerprints | [docs/page.md#strip-and-skeleton](docs/page.md#strip-and-skeleton) |
 | **Grammars** (opt-in) | any pest grammar compiled at run time, 3–5× faster than `pest_derive` | [docs/grammars.md](docs/grammars.md) |
@@ -275,6 +275,9 @@ Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) first.
 MIT OR Apache-2.0, at your option ([LICENSE-MIT](LICENSE-MIT),
 [LICENSE-APACHE](LICENSE-APACHE)), like pest.
 `crates/pestle-grammar/src/vm.rs` derives from `pest_vm`.
+`crates/pestle-html/data/public_suffix_list.dat` is the
+[Public Suffix List](https://publicsuffix.org), bundled as it is, under the
+[MPL 2.0](https://mozilla.org/MPL/2.0/).
 
 ---
 

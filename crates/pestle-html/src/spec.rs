@@ -5,11 +5,11 @@
 //!
 //! | key | what |
 //! | --- | --- |
-//! | `select` | CSS selector, relative to the field's scope; absent: the scope element itself |
+//! | `select` | CSS selector: elements under the field's scope, matched in the page's context (as `querySelectorAll`); absent: the scope element itself |
 //! | `all` | every match (an array), not only the first with a value |
 //! | `limit` | with `all`: at most this many |
 //! | `attr` | read this attribute instead of the text |
-//! | `text` | `"visible"` (default: as a reader sees it), `"raw"` (all text, as is), `"own"` (only the element's own text) |
+//! | `text` | `"visible"` (default: as a reader sees it), `"lines"` (as visible, a line per block), `"raw"` (all text, as is), `"own"` (only the element's own text) |
 //! | `html` | read the element's outer HTML |
 //! | `exists` | `true` when something matches, else `false` |
 //! | `url` | resolve against the page (`true`), or only as an http(s) page, without `#…` (`"http"`) |
@@ -20,11 +20,13 @@
 //! | `json` | parse as JSON (JSON-LD's CDATA and stray control characters tolerated) |
 //! | `parse` | parse with a pest grammar: `"name"`, `"name.rule"`, or `{ grammar, rule, find, all, limit, lists, numbers, byRule, trim, tree }` |
 //! | `fields` | an object per match, its fields relative to the match |
+//! | `closest` | under a scope: when nothing under it has a value, the nearest ancestor's (`true`, or `{ depth }`, 8 levels by default) |
 //! | `default` | the value when nothing matched |
 //! | `emit` | (top-level, with `all`) hand items over as they complete instead of keeping them |
 //!
 //! Shorthands: `"h1"` is `{ "select": "h1" }`; `"meta[property=og:image]@content"`
-//! reads an attribute; `["li.act"]` is every match.
+//! (or `{ "select": "meta[property=og:image]@content" }`) reads an attribute;
+//! `["li.act"]` is every match.
 
 use std::collections::HashMap;
 #[cfg(feature = "grammar")]
@@ -56,6 +58,7 @@ impl std::error::Error for SpecError {}
 #[derive(Debug)]
 pub(crate) enum Read {
     Visible,
+    Lines,
     Raw,
     Own,
     Attr(String),
@@ -106,7 +109,28 @@ pub(crate) struct FieldDef {
     pub(crate) object: Option<usize>,
     pub(crate) default: Option<Value>,
     pub(crate) emit: bool,
+    pub(crate) closest: Option<Closest>,
 }
+
+/// A field that falls back to its scope's ancestors.
+pub(crate) struct Closest {
+    /// How many ancestors are tried at most.
+    pub(crate) depth: usize,
+    /// Its [`Spec::tracks`] entry.
+    pub(crate) track: usize,
+}
+
+/// What a `closest` field's selector matches anywhere in the page, followed as the page is read.
+pub(crate) struct TrackDef {
+    /// The field: its object and its index there.
+    pub(crate) object: usize,
+    pub(crate) field: usize,
+    /// The field's selector, for the whole document.
+    pub(crate) selector: Selector,
+}
+
+/// How many ancestors a `closest` field tries by default.
+const CLOSEST_DEPTH: usize = 8;
 
 pub(crate) struct ObjectDef {
     pub(crate) fields: Vec<FieldDef>,
@@ -165,6 +189,8 @@ pub struct Spec {
     pub(crate) siblings: bool,
     /// Some selector counts siblings by name (`*-of-type`).
     pub(crate) types: bool,
+    /// Every `closest` field's selector.
+    pub(crate) tracks: Vec<TrackDef>,
 }
 
 impl fmt::Debug for Spec {
@@ -229,9 +255,10 @@ impl Spec {
             errors: Vec::new(),
             siblings: false,
             types: false,
+            tracks: Vec::new(),
         };
         cx.objects.push(ObjectDef::new(Vec::new()));
-        let root = cx.object(fields, "", true);
+        let root = cx.object(fields, "", 0);
         cx.objects[0] = root;
         if !options.lenient && !cx.errors.is_empty() {
             return Err(SpecError { errors: cx.errors });
@@ -241,6 +268,7 @@ impl Spec {
                 objects: cx.objects,
                 siblings: cx.siblings,
                 types: cx.types,
+                tracks: cx.tracks,
             },
             cx.errors,
         ))
@@ -253,11 +281,12 @@ struct Compiler<'g> {
     errors: Vec<String>,
     siblings: bool,
     types: bool,
+    tracks: Vec<TrackDef>,
 }
 
 const KEYS: &[&str] = &[
     "select", "all", "limit", "attr", "text", "html", "exists", "url", "pattern", "max", "collapse", "number", "json",
-    "parse", "fields", "default", "emit",
+    "parse", "fields", "default", "emit", "closest",
 ];
 
 /// `selector@attr`: the attribute after the last `@` outside brackets and quotes.
@@ -289,7 +318,8 @@ fn split_attr(s: &str) -> (&str, Option<&str>) {
 }
 
 impl Compiler<'_> {
-    fn object(&mut self, fields: &Map<String, Value>, prefix: &str, top: bool) -> ObjectDef {
+    /// The fields of the object at `at` in [`Spec::objects`] (0: the top level).
+    fn object(&mut self, fields: &Map<String, Value>, prefix: &str, at: usize) -> ObjectDef {
         let mut out = Vec::with_capacity(fields.len());
         for (name, value) in fields {
             let path = if prefix.is_empty() {
@@ -298,7 +328,15 @@ impl Compiler<'_> {
                 format!("{prefix}.{name}")
             };
             // A field with a problem of its own is left out; a problem in its nested fields leaves out only those.
-            if let Some(f) = self.field(name, &path, value, top) {
+            if let Some((mut f, track)) = self.field(name, &path, value, at == 0) {
+                if let (Some(c), Some(selector)) = (&mut f.closest, track) {
+                    c.track = self.tracks.len();
+                    self.tracks.push(TrackDef {
+                        object: at,
+                        field: out.len(),
+                        selector,
+                    });
+                }
                 out.push(f);
             }
         }
@@ -309,7 +347,8 @@ impl Compiler<'_> {
         self.errors.push(format!("{path}: {message}"));
     }
 
-    fn field(&mut self, name: &str, path: &str, value: &Value, top: bool) -> Option<FieldDef> {
+    /// The field, and for a `closest` one its selector for the whole document.
+    fn field(&mut self, name: &str, path: &str, value: &Value, top: bool) -> Option<(FieldDef, Option<Selector>)> {
         let before = self.errors.len();
         let mut def = Map::new();
         let spec = match value {
@@ -322,11 +361,24 @@ impl Compiler<'_> {
                 &def
             }
             Value::Array(items) if items.len() == 1 => {
-                let mut inner = self.field(name, path, &items[0], top)?;
+                let (mut inner, track) = self.field(name, path, &items[0], top)?;
+                if inner.closest.is_some() {
+                    self.error(path, "closest reads one value, not all");
+                    return None;
+                }
                 inner.all = true;
-                return Some(inner);
+                return Some((inner, track));
             }
-            Value::Object(o) => o,
+            // `select: "a@href"` reads the attribute, as the string shorthand does.
+            Value::Object(o) => match o.get("select").and_then(Value::as_str).map(split_attr) {
+                Some((select, Some(attr))) if !o.contains_key("attr") => {
+                    def = o.clone();
+                    def.insert("select".into(), Value::String(select.into()));
+                    def.insert("attr".into(), Value::String(attr.into()));
+                    &def
+                }
+                _ => o,
+            },
             _ => {
                 self.error(path, "a field is a selector, [selector] or an object");
                 return None;
@@ -374,10 +426,14 @@ impl Compiler<'_> {
         } else {
             match string("text") {
                 None | Some("visible") => Read::Visible,
+                Some("lines") => Read::Lines,
                 Some("raw") => Read::Raw,
                 Some("own") => Read::Own,
                 Some(other) => {
-                    self.error(path, format!("text is \"visible\", \"raw\" or \"own\", not {other:?}"));
+                    self.error(
+                        path,
+                        format!("text is \"visible\", \"lines\", \"raw\" or \"own\", not {other:?}"),
+                    );
                     Read::Visible
                 }
             }
@@ -417,10 +473,53 @@ impl Compiler<'_> {
         let collapse = spec
             .get("collapse")
             .and_then(Value::as_bool)
-            .unwrap_or(matches!(read, Read::Visible | Read::Own | Read::Attr(_)));
+            .unwrap_or(matches!(read, Read::Visible | Read::Lines | Read::Own | Read::Attr(_)));
         let emit = flag("emit");
         if emit && !(top && flag("all")) {
             self.error(path, "emit is for top-level fields with all");
+        }
+        let closest = match spec.get("closest") {
+            None | Some(Value::Null) | Some(Value::Bool(false)) => None,
+            Some(Value::Bool(true)) => Some(CLOSEST_DEPTH),
+            Some(Value::Object(o)) if o.keys().all(|k| k == "depth") => match o.get("depth") {
+                None => Some(CLOSEST_DEPTH),
+                Some(d) => match d.as_u64() {
+                    Some(d) if d >= 1 => Some(d as usize),
+                    _ => {
+                        self.error(path, "closest's depth is a number of levels, at least 1");
+                        None
+                    }
+                },
+            },
+            Some(_) => {
+                self.error(path, "closest is true or { depth }");
+                None
+            }
+        };
+        // The selector again, for the whole page: what the ancestors hold.
+        let mut track = None;
+        if closest.is_some() {
+            if top {
+                self.error(path, "closest is for a field under a scope");
+            } else if flag("all") || spec.contains_key("fields") {
+                self.error(path, "closest reads one value, not all or an object");
+            } else if let (Some(sel), Some(Value::String(s))) = (&selector, spec.get("select")) {
+                if sel.waits_on_siblings() {
+                    self.error(
+                        path,
+                        "closest cannot wait on later siblings (:last-child, :only-child, :nth-last-child() …)",
+                    );
+                } else if sel.leading() {
+                    self.error(path, "closest needs a selector that does not start with a combinator");
+                } else {
+                    match Selector::new(s, false) {
+                        Ok(whole) => track = Some(whole),
+                        Err(e) => self.error(path, format!("selector: {e}")),
+                    }
+                }
+            } else if selector.is_none() && self.errors.len() == before {
+                self.error(path, "closest needs a selector");
+            }
         }
         if self.errors.len() > before {
             return None;
@@ -429,7 +528,7 @@ impl Compiler<'_> {
             Some(Value::Object(fields)) => {
                 let at = self.objects.len();
                 self.objects.push(ObjectDef::new(Vec::new()));
-                let inner = self.object(fields, &format!("{path}{}", if flag("all") { "[]" } else { "" }), false);
+                let inner = self.object(fields, &format!("{path}{}", if flag("all") { "[]" } else { "" }), at);
                 self.objects[at] = inner;
                 Some(at)
             }
@@ -444,7 +543,7 @@ impl Compiler<'_> {
             .and_then(Value::as_u64)
             .map_or(usize::MAX, |n| n as usize);
         let max = spec.get("max").and_then(Value::as_u64).map(|n| n as usize);
-        Some(FieldDef {
+        let field = FieldDef {
             name: name.to_owned(),
             path: path.to_owned(),
             selector,
@@ -459,7 +558,9 @@ impl Compiler<'_> {
             object,
             default: spec.get("default").cloned(),
             emit,
-        })
+            closest: closest.map(|depth| Closest { depth, track: 0 }),
+        };
+        Some((field, track))
     }
 
     #[cfg(feature = "grammar")]

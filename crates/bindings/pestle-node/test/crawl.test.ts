@@ -2,7 +2,17 @@ import { gzipSync } from "node:zlib";
 
 import { describe, expect, it } from "vitest";
 
-import { NotASitemap, parseRobots, parseSitemap, readSitemap, readSitemapAsync, Robots } from "../ts/index.js";
+import {
+  NotASitemap,
+  PUBLIC_SUFFIX_LIST_VERSION,
+  parseRobots,
+  parseSitemap,
+  publicSuffix,
+  readSitemap,
+  readSitemapAsync,
+  registrableDomain,
+  Robots,
+} from "../ts/index.js";
 import * as festimap from "./reference-crawl.js";
 import { random } from "./reference.js";
 
@@ -134,5 +144,21 @@ describe("sitemaps", () => {
     expect(rel.entries[0]!.url).toBe("https://v.example/e/1");
     const res = new Response(gzipSync(new TextEncoder().encode("<sitemapindex><sitemap><loc>https://v.example/s1.xml</loc></sitemap></sitemapindex>")));
     expect(await collect(parseSitemap(res))).toEqual([{ kind: "sitemap", url: "https://v.example/s1.xml" }]);
+  });
+});
+
+describe("the Public Suffix List", () => {
+  it("tells a site's own domain", () => {
+    expect(registrableDomain("tickets.example.com.mx")).toBe("example.com.mx");
+    expect(registrableDomain("foo.github.io")).toBe("foo.github.io");
+    expect(registrableDomain("www.example.co.uk")).toBe("example.co.uk");
+    expect(registrableDomain("co.uk")).toBe("co.uk");
+    expect(publicSuffix("co.uk")).toBe("co.uk");
+    expect(publicSuffix("shop.foo.github.io")).toBe("github.io");
+    expect(registrableDomain("Tickets.Café.example.")).toBe("xn--caf-dma.example");
+    expect(registrableDomain("10.0.0.1")).toBe("10.0.0.1");
+    expect(publicSuffix("10.0.0.1")).toBeNull();
+    expect(registrableDomain(".com")).toBeNull();
+    expect(PUBLIC_SUFFIX_LIST_VERSION).toMatch(/^\d{4}-\d{2}-\d{2}/);
   });
 });

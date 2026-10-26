@@ -437,7 +437,7 @@ fn strict_json_ld_is_json_ld_1_1() {
         assert!(s.items.is_empty(), "{block}: {:?}", s.items);
         assert_eq!(
             s.warnings,
-            [format!("json-ld: a block was left out: {code}")],
+            [format!("json-ld[0]: a block was left out: {code}")],
             "{block}"
         );
     }
@@ -462,4 +462,33 @@ fn strict_json_ld_is_json_ld_1_1() {
         .structured
         .unwrap();
     assert_eq!(s.items[0]["name"], "x");
+}
+
+#[test]
+fn json_ld_warnings_name_the_block() {
+    let x = Extractor::new(
+        &json!({}),
+        &Default::default(),
+        ExtractorOptions {
+            structured: Some(StructuredOptions {
+                raw: true,
+                ..Default::default()
+            }),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    let html = r#"<script type="application/ld+json">{"a":1}</script>
+        <script type="application/ld+json">{"b":2,}</script>
+        <script type="application/ld+json">{"c":[1,],}</script>
+        <script type="application/ld+json">{"d":4}</script>"#;
+    let s = x.extract(html.as_bytes(), None).structured.unwrap();
+    // Block 2 repaired twice over: one warning for its trailing commas.
+    assert_eq!(
+        s.warnings,
+        ["json-ld[1]: trailing commas", "json-ld[2]: trailing commas"]
+    );
+    let raw = s.raw.unwrap();
+    assert_eq!(raw.json_ld_repaired, [1, 2]);
+    assert_eq!(raw.json_ld.len(), 4);
 }

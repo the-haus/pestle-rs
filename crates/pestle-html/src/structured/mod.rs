@@ -96,7 +96,8 @@ pub struct Structured {
     /// With [`StructuredOptions::raw`]: each format in its own form.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub raw: Option<Raw>,
-    /// What had to be repaired or was cut (`json-ld: trailing commas`).
+    /// What had to be repaired or was cut, a JSON-LD block's by its index in [`Raw::json_ld`]
+    /// (`json-ld[1]: trailing commas`).
     pub warnings: Vec<String>,
 }
 
@@ -106,6 +107,9 @@ pub struct Raw {
     /// an array for several values glued together in one.
     #[serde(rename = "jsonLd")]
     pub json_ld: Vec<Value>,
+    /// The indices in `json_ld` of the blocks that were repaired to be read (lenient reading).
+    #[serde(rename = "jsonLdRepaired")]
+    pub json_ld_repaired: Vec<usize>,
     pub microdata: Value,
     pub rdfa: Value,
     pub microformats: Value,
@@ -157,14 +161,14 @@ impl StructuredPass {
         let mut raw = Raw::default();
         if self.opts.json_ld {
             let mut j = JsonLd::new(&mut graph, self.base.as_ref(), &self.opts.json_ld_options);
-            for block in &self.blocks {
+            for (i, block) in self.blocks.iter().enumerate() {
                 if self.opts.json_ld_options.strict {
                     let warning = match serde_json::from_str::<Value>(block.trim()) {
                         Ok(v) => {
                             let w = j
                                 .block_strict(&v)
                                 .err()
-                                .map(|e| format!("json-ld: a block was left out: {}", e.0));
+                                .map(|e| format!("json-ld[{i}]: a block was left out: {}", e.0));
                             if self.opts.raw {
                                 raw.json_ld.push(v);
                             }
@@ -174,7 +178,7 @@ impl StructuredPass {
                             if self.opts.raw {
                                 raw.json_ld.push(Value::Null);
                             }
-                            Some("json-ld: a block was left out: it is not JSON".into())
+                            Some(format!("json-ld[{i}]: a block was left out: it is not JSON"))
                         }
                     };
                     if let Some(w) = warning.filter(|w| !self.warnings.contains(w)) {
@@ -183,8 +187,11 @@ impl StructuredPass {
                     continue;
                 }
                 let read = lenient::read(block);
+                if !read.repairs.is_empty() {
+                    raw.json_ld_repaired.push(i);
+                }
                 for r in read.repairs {
-                    let w = format!("json-ld: {r}");
+                    let w = format!("json-ld[{i}]: {r}");
                     if !self.warnings.contains(&w) {
                         self.warnings.push(w);
                     }
@@ -325,10 +332,10 @@ impl Handler for StructuredPass {
                 // What fits, and nothing after it: a later, shorter run would not join on.
                 s.push_str(crate::text::cut_bytes(t, self.opts.max_block_bytes - s.len()));
                 *cut = true;
-                let w = "json-ld: a block was cut at max_block_bytes";
-                if !self.warnings.iter().any(|x| x == w) {
-                    self.warnings.push(w.into());
-                }
+                self.warnings.push(format!(
+                    "json-ld[{}]: a block was cut at max_block_bytes",
+                    self.blocks.len()
+                ));
             }
         }
         if let Some(m) = &mut self.microdata {

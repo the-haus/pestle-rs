@@ -210,7 +210,7 @@ for (const sitemap of robots.sitemaps) {
 }
 ```
 
-robots.txt follows RFC 9309 and reads misspellings the way Google does. Sitemaps stream with a gzip-bomb limit and throw `NotASitemap` on soft 404s. Details: [docs/crawling.md](https://github.com/the-haus/pestle-rs/blob/main/docs/crawling.md).
+robots.txt follows RFC 9309 and reads misspellings the way Google does. Sitemaps stream with a gzip-bomb limit and throw `NotASitemap` on soft 404s. `registrableDomain(new URL(link).hostname)` tells the site's own pages from its ticket shop's, by the bundled Public Suffix List. Details: [docs/crawling.md](https://github.com/the-haus/pestle-rs/blob/main/docs/crawling.md).
 
 Which of those pages are the events (or products, or articles)? `inferRoutes` turns the URLs into the site's routes, as Next.js writes them, with counts:
 
@@ -428,6 +428,7 @@ it("reads the agenda", () => {
 | **`parseRobots(text, token)`** | A `Robots`: `allows(url)`, `allowsAll(urls)`, `rules`, `crawlDelay`, `sitemaps`. `Robots.allowAll()`, `Robots.disallowAll()`. |
 | `parseSitemap(source, options?)` | An async generator of `SitemapEntry`. Options: `url`, `maxBytes`, `maxEntries`, `maxEntryBytes`. |
 | `readSitemap(body, options?)` / `readSitemapAsync` | A whole sitemap: `{ format, entries, gzip, warnings? }`. |
+| `registrableDomain(host)`, `publicSuffix(host)` | By the bundled Public Suffix List (`PUBLIC_SUFFIX_LIST_VERSION`): `"example.com.mx"` of `"tickets.example.com.mx"`, `"foo.github.io"` of itself. |
 | **`inferRoutes(urls, options?)`** | A `Routes` from URLs or sitemap entries: `sites` (a tree of `Route`s each), `find(url)`, `findAll(urls)`, `items()`, `outline()`. `new RouteBuilder(options?)` takes them one by one: `add(url \| entry)`, `finish()`. Options: `minSiblings`, `maxExamples`, `maxUrls`. |
 | **`strip(html, options?)`** | `{ html, tokens, truncated }`: festimap's `cleanForLearn`. |
 | `skeleton(html, options?)`, `templateHash(pathsPerPage)` | The template fingerprint. |
@@ -442,10 +443,10 @@ A field is a selector string, `[selector]` for every match, `"selector@attr"` fo
 
 | key | what |
 | --- | --- |
-| `select` | CSS selector, relative to the field's scope (absent: the scope element itself) |
+| `select` | CSS selector: the elements under the field's scope, matched in the page as `querySelectorAll` matches (`:scope h3` keeps to the scope; absent: the scope element itself) |
 | `all`, `limit` | every match as an array, at most `limit` |
 | `attr` | read this attribute instead of the text |
-| `text` | `"visible"` (default: as a reader sees it), `"raw"` (as is, scripts too), `"own"` (only the element's own text) |
+| `text` | `"visible"` (default: as a reader sees it), `"lines"` (visible, a line per block), `"raw"` (as is, scripts too), `"own"` (only the element's own text) |
 | `html` | the element's outer HTML |
 | `exists` | `true` when something matches |
 | `url` | resolve against the page (`true`), or as an http(s) page without `#…` (`"http"`) |
@@ -454,6 +455,7 @@ A field is a selector string, `[selector]` for every match, `"selector@attr"` fo
 | `json` | parse as JSON |
 | `max`, `collapse` | cut to this many characters; collapse whitespace |
 | `fields` | an object per match, its fields relative to the match |
+| `closest` | under a scope: when nothing under it has a value, the nearest ancestor's (`true`, or `{ depth }`, 8 levels): a timetable's day or stage stated once above its rows |
 | `default` | the value when nothing matched (else `null`, or `[]` with `all`) |
 | `emit` | top-level with `all`: hand items over as they complete |
 

@@ -36,6 +36,14 @@ and sets the caps: `maxLinks` (5,000), `maxImages` (2,000), `maxHeadings`
 (500), `maxEmbedded` (32), `maxText` (240 characters of a link's or
 heading's text).
 
+`text: true` also gives the page's visible text as `text`, a line per
+block: a newline where a heading, a paragraph, a list item, a table row
+or a `<br>` breaks it, spaces collapsed within a line, empty lines left
+out, nothing of the `<head>`, scripts, styles, `<template>` and
+`<noscript>`, entities decoded. It is what a field reads with
+`text: "lines"` ([spec](spec.md#how-values-are-read)), here for the whole
+page in the pass a crawl makes anyway; `maxTextBytes` (4 MiB) bounds it.
+
 ## Charsets
 
 Bytes are read in the encoding the page is in, found as browsers find it:

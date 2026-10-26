@@ -5,7 +5,8 @@
 //! the links with their text, the images (lazy-loaded ones too), headings,
 //! embedded frames, e-mail addresses and phone numbers, and the JSON pages
 //! carry for their scripts (`__NEXT_DATA__`, `<script type="application/json">`,
-//! `window.__INITIAL_STATE__ = {…}`).
+//! `window.__INITIAL_STATE__ = {…}`), and on request the page's visible
+//! text, a line per block.
 //!
 //! Every URL is absolute (against `<base href>` when there is one); links
 //! and images are http(s) and without `#…`. Every list is capped and every
@@ -37,6 +38,10 @@ pub struct PageOptions {
     /// At most this many embedded values, from scripts of at most this many bytes.
     pub max_embedded: usize,
     pub max_script_bytes: usize,
+    /// The page's visible text, a line per block ([`Page::text`]).
+    pub text: bool,
+    /// The most bytes [`Page::text`] holds.
+    pub max_text_bytes: usize,
 }
 
 impl Default for PageOptions {
@@ -52,6 +57,8 @@ impl Default for PageOptions {
             max_text: 240,
             max_embedded: 32,
             max_script_bytes: 8 << 20,
+            text: false,
+            max_text_bytes: 4 << 20,
         }
     }
 }
@@ -205,6 +212,11 @@ pub struct Page {
     pub phones: Vec<String>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub embedded: Vec<Embedded>,
+    /// With [`PageOptions::text`]: the text a reader sees, a line per block (a heading, a
+    /// paragraph, a list item, a table row) or `<br>`, spaces in a line collapsed, nothing of
+    /// the `<head>`, scripts, styles, `<template>` and `<noscript>`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub text: Option<String>,
     /// A bot wall instead of the page: `cloudflare`, `datadome`, `perimeterx`, `incapsula`,
     /// `akamai` or `captcha`.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -265,12 +277,63 @@ pub(crate) struct PagePass {
     open_link: Option<(usize, usize)>,
     svg_depth: Option<usize>,
     html_lang: Option<String>,
+    /// The page's text so far ([`PageOptions::text`]).
+    text: Option<PageText>,
+}
+
+/// The page's text as it streams by.
+struct PageText {
+    out: String,
+    /// Inside an element whose text is never shown (its frame).
+    skip: Option<usize>,
+    full: bool,
+}
+
+impl PageText {
+    fn push(&mut self, s: &str, max: usize) {
+        if self.full {
+            return;
+        }
+        if self.out.len() + s.len() > max {
+            self.out.push_str(crate::text::cut_bytes(s, max - self.out.len()));
+            self.full = true;
+        } else {
+            self.out.push_str(s);
+        }
+    }
+
+    fn open(&mut self, depth: usize, kind: u8, max: usize) {
+        if self.skip.is_some() {
+            return;
+        }
+        if crate::tags::is_never_text(kind) || matches!(kind, crate::tags::HEAD | crate::tags::TITLE) {
+            self.skip = Some(depth);
+        } else {
+            self.brk(kind, max);
+        }
+    }
+
+    fn close(&mut self, depth: usize, kind: u8, max: usize) {
+        if self.skip == Some(depth) {
+            self.skip = None;
+        } else if self.skip.is_none() {
+            self.brk(kind, max);
+        }
+    }
+
+    /// Where an element opens or closes: a line break for a block, a space for the rest but inline ones.
+    fn brk(&mut self, kind: u8, max: usize) {
+        match crate::tags::text_break(kind, true) {
+            Some('\n') => self.push("\n", max),
+            Some(_) => self.push(" ", max),
+            None => {}
+        }
+    }
 }
 
 impl PagePass {
     pub(crate) fn new(opts: PageOptions, url: Option<Url>) -> PagePass {
         PagePass {
-            opts,
             page: Page::default(),
             base: url.clone(),
             url,
@@ -281,11 +344,17 @@ impl PagePass {
             open_link: None,
             svg_depth: None,
             html_lang: None,
+            text: opts.text.then(|| PageText {
+                out: String::new(),
+                skip: None,
+                full: false,
+            }),
+            opts,
         }
     }
 
     pub(crate) fn wants_text(&self) -> bool {
-        !self.captures.is_empty()
+        !self.captures.is_empty() || self.text.is_some()
     }
 
     /// `href` absolute, any scheme (feeds, icons, canonical).
@@ -625,6 +694,12 @@ impl PagePass {
         while let Some((_, c, t)) = self.captures.pop() {
             self.close_capture(c, t);
         }
+        if let Some(t) = self.text.take() {
+            if t.full {
+                self.warn("page: text was cut at max_text_bytes");
+            }
+            self.page.text = Some(crate::text::collapse_lines(&t.out));
+        }
         let p = &mut self.page;
         p.charset = charset.to_owned();
         if p.blocked.is_none() {
@@ -675,6 +750,9 @@ impl Handler for PagePass {
     fn open(&mut self, tree: &Tree) {
         let depth = tree.frames.len() - 1;
         let frame = &tree.frames[depth];
+        if let Some(t) = &mut self.text {
+            t.open(depth, frame.el.kind, self.opts.max_text_bytes);
+        }
         if frame.templates > 0 {
             return;
         }
@@ -764,6 +842,9 @@ impl Handler for PagePass {
 
     fn close(&mut self, tree: &Tree) {
         let depth = tree.frames.len() - 1;
+        if let Some(t) = &mut self.text {
+            t.close(depth, tree.frames[depth].el.kind, self.opts.max_text_bytes);
+        }
         if self.svg_depth == Some(depth) {
             self.svg_depth = None;
         }
@@ -779,6 +860,15 @@ impl Handler for PagePass {
 
     fn text(&mut self, _: &Tree, text: &Text<'_>) {
         let t = text.get();
+        if let Some(p) = self.text.as_mut().filter(|p| p.skip.is_none()) {
+            let max = self.opts.max_text_bytes;
+            // Its own line breaks are spaces: lines break where blocks do.
+            if t.contains(['\n', '\r']) {
+                p.push(&t.replace(['\n', '\r'], " "), max);
+            } else {
+                p.push(t, max);
+            }
+        }
         let max_script = self.opts.max_script_bytes;
         let max_text = self.opts.max_text * 8;
         let mut cut_script = false;

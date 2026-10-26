@@ -80,7 +80,10 @@ export const {
   NativeRoutes,
   NativeSitemapReader,
   hasGrammars,
+  publicSuffix,
+  publicSuffixListVersion,
   readSitemapAsync,
+  registrableDomain,
   setCallLimit,
   templateHash,
 } = native;

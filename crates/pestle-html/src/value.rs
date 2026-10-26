@@ -14,7 +14,7 @@ use crate::number::lenient_number;
 #[cfg(feature = "grammar")]
 use crate::spec::ParseDef;
 use crate::spec::{FieldDef, Read, Then, UrlMode};
-use crate::text::{collapse, collapse_owned, cut};
+use crate::text::{collapse, collapse_lines, collapse_owned, cut};
 
 /// An href as festimap's crawler reads it: absolute, http(s) only, no
 /// `#…`, `webcal:` as `https:`; none for an empty one, a fragment, or
@@ -47,7 +47,11 @@ pub(crate) fn finish(def: &FieldDef, raw: String, cx: &Context<'_>, errors: &mut
     if matches!(def.read, Read::Exists) {
         return Some(out::Value::Bool(true));
     }
-    let mut s = if def.collapse { collapse_owned(raw) } else { raw };
+    let mut s = match (def.collapse, &def.read) {
+        (true, Read::Lines) => collapse_lines(&raw),
+        (true, _) => collapse_owned(raw),
+        (false, _) => raw,
+    };
     if let Some(mode) = def.url {
         let href = match &def.read {
             // A srcset's first candidate.
@@ -67,7 +71,9 @@ pub(crate) fn finish(def: &FieldDef, raw: String, cx: &Context<'_>, errors: &mut
     if let Some(re) = &def.pattern {
         let caps = re.captures(&s)?;
         let m = caps.get(1).or_else(|| caps.get(0))?;
-        s = if def.collapse {
+        s = if def.collapse && matches!(def.read, Read::Lines) {
+            collapse_lines(m.as_str())
+        } else if def.collapse {
             collapse(m.as_str())
         } else {
             m.as_str().to_owned()

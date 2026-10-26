@@ -144,6 +144,8 @@ pub struct NativePageOptions {
     pub max_headings: Option<u32>,
     pub max_text: Option<u32>,
     pub max_embedded: Option<u32>,
+    pub text: Option<bool>,
+    pub max_text_bytes: Option<u32>,
 }
 
 fn page_options(o: NativePageOptions) -> pestle_html::page::PageOptions {
@@ -160,6 +162,8 @@ fn page_options(o: NativePageOptions) -> pestle_html::page::PageOptions {
         max_text: n(o.max_text, d.max_text),
         max_embedded: n(o.max_embedded, d.max_embedded),
         max_script_bytes: d.max_script_bytes,
+        text: o.text.unwrap_or(d.text),
+        max_text_bytes: n(o.max_text_bytes, d.max_text_bytes),
     }
 }
 
@@ -651,6 +655,24 @@ pub fn template_hash(pages: Vec<Vec<String>>) -> Option<String> {
 }
 
 // ── robots.txt and sitemaps ──────────────────────────────────────────────
+
+/// A host's registrable domain, by the bundled Public Suffix List.
+#[napi(catch_unwind)]
+pub fn registrable_domain(host: String) -> Option<String> {
+    pestle_html::psl::registrable_domain(&host)
+}
+
+/// A host's public suffix, by the bundled Public Suffix List.
+#[napi(catch_unwind)]
+pub fn public_suffix(host: String) -> Option<String> {
+    pestle_html::psl::public_suffix(&host)
+}
+
+/// The date of the bundled Public Suffix List.
+#[napi(catch_unwind)]
+pub fn public_suffix_list_version() -> String {
+    pestle_html::psl::list_version().to_owned()
+}
 
 /// A robots.txt read for one product token.
 #[napi]

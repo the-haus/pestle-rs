@@ -59,6 +59,8 @@ export interface NativePageOptions {
   maxHeadings?: number
   maxText?: number
   maxEmbedded?: number
+  text?: boolean
+  maxTextBytes?: number
 }
 export interface NativeAriaOptions {
   /** `"default"` (Playwright's `ariaSnapshot()`) or `"ai"`. */
@@ -123,6 +125,12 @@ export interface NativeItem {
 }
 /** The skeleton hash that pages share (the paths at least half of them have). */
 export declare function templateHash(pages: Array<Array<string>>): string | null
+/** A host's registrable domain, by the bundled Public Suffix List. */
+export declare function registrableDomain(host: string): string | null
+/** A host's public suffix, by the bundled Public Suffix List. */
+export declare function publicSuffix(host: string): string | null
+/** The date of the bundled Public Suffix List. */
+export declare function publicSuffixListVersion(): string
 export interface NativeSitemapOptions {
   maxEntryBytes?: number
   maxBytes?: number

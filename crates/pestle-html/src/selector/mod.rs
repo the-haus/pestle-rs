@@ -5,9 +5,12 @@
 //! `^=`, `$=`, `*=`, `!=`, with `i`/`s` and HTML's case-insensitive
 //! attributes), the four combinators, `:not()`, `:is()`/`:where()`/
 //! `:matches()`, `:first-child`, `:first-of-type`, `:nth-child()`,
-//! `:nth-of-type()`, `:root` and `:scope`. A selector under a scope is
-//! relative to it as css-select makes it: `a b` means `:scope a b`, `> a`
-//! means `:scope > a`.
+//! `:nth-of-type()`, `:root` and `:scope`. A selector under a scope picks
+//! elements under it, each matched in the page's context, as the DOM's
+//! `element.querySelectorAll` does (css-select with `relativeSelector:
+//! false`): `.card h3` under a `.card` is its `h3`. `:scope h3` keeps to
+//! the scope, and `> a` means `:scope > a`. Inside `:has()` a selector is
+//! relative to the element tested: `:has(a b)` means `:has(:scope a b)`.
 //!
 //! What only the rest of the document can tell is allowed on the selected
 //! element (the last compound) and settled later: `:has()`, `:contains()`
@@ -184,6 +187,8 @@ pub struct Selector {
     source: String,
     siblings: bool,
     types: bool,
+    /// Some alternative starts with a combinator (`> a`).
+    leading: bool,
 }
 
 impl std::fmt::Debug for Selector {
@@ -196,15 +201,24 @@ impl std::fmt::Debug for Selector {
 pub type Matched = smallvec::SmallVec<[u16; 2]>;
 
 impl Selector {
-    /// A selector for the document (`scoped` false) or relative to a scope element.
+    /// A selector for the document (`scoped` false) or for the elements under a scope element,
+    /// matched in the page's context.
     pub fn new(source: &str, scoped: bool) -> Result<Selector, String> {
         let list = parse::parse_list(source)?;
-        Self::compile(list, source, scoped, true)
+        Self::compile(list, source, scoped, false, true)
     }
 
-    fn compile(list: Vec<Complex>, source: &str, scoped: bool, deferrable: bool) -> Result<Selector, String> {
+    /// `relative`: what names no `:scope` is put under it (`a b` → `:scope a b`), as in `:has()`.
+    fn compile(
+        list: Vec<Complex>,
+        source: &str,
+        scoped: bool,
+        relative: bool,
+        deferrable: bool,
+    ) -> Result<Selector, String> {
         let mut alts = Vec::with_capacity(list.len());
         let mut siblings = false;
+        let leading = list.iter().any(|c| c.leading.is_some());
         for complex in list {
             let mut parts = complex.parts;
             if matches!(complex.leading, Some(Combinator::Adjacent | Combinator::Sibling)) {
@@ -222,7 +236,7 @@ impl Selector {
             if let Some(c) = complex.leading {
                 parts[0].0 = c;
                 parts.insert(0, scope);
-            } else if scoped && !parts.iter().any(|(_, c)| mentions_scope(c)) {
+            } else if scoped && relative && !parts.iter().any(|(_, c)| mentions_scope(c)) {
                 parts.insert(0, scope);
                 implicit_scope = true;
             }
@@ -252,7 +266,7 @@ impl Selector {
                         Cond::Empty => deferred.empty = true,
                         Cond::Contains { text, ignore_case } => deferred.contains.push((text, ignore_case)),
                         Cond::Has(list) => {
-                            let inner = Selector::compile(list, source, true, false)?;
+                            let inner = Selector::compile(list, source, true, true, false)?;
                             siblings |= inner.siblings;
                             deferred.has.push(inner);
                         }
@@ -289,7 +303,18 @@ impl Selector {
             source: source.to_owned(),
             siblings,
             types,
+            leading,
         })
+    }
+
+    /// Whether some alternative starts with a combinator (`> a`: from the scope).
+    pub(crate) fn leading(&self) -> bool {
+        self.leading
+    }
+
+    /// Whether some alternative is settled only when the selected element's parent closes (`:last-child` …).
+    pub(crate) fn waits_on_siblings(&self) -> bool {
+        self.alts.iter().any(|a| !a.deferred.siblings.is_empty())
     }
 
     pub fn source(&self) -> &str {
@@ -358,12 +383,13 @@ impl Selector {
         self.alts.iter().any(|a| !a.deferred.is_empty())
     }
 
-    /// The alternatives the innermost open element matches, given the scope element's frame.
+    /// The alternatives the innermost open element matches, given the scope element's frame
+    /// (only an element under it can match).
     pub fn matches(&self, tree: &Tree, scope: Option<usize>) -> Matched {
         let Some(top) = tree.frames.len().checked_sub(1) else {
             return Matched::new();
         };
-        if tree.in_template(top, scope) {
+        if scope.is_some_and(|s| top <= s) || tree.in_template(top, scope) {
             return Matched::new();
         }
         let cx = Cx { tree, scope };

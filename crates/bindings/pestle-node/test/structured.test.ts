@@ -39,7 +39,7 @@ describe("structured data", () => {
     const strict = extractStructured(PAGE, { url: "https://v.example/agenda", lenient: false, microdata: false, microformats: false });
     // The block's trailing comma makes it no JSON: left out, and said why.
     expect(strict.items.filter((i) => i["@format"] === "json-ld")).toEqual([]);
-    expect(strict.warnings).toContain("json-ld: a block was left out: it is not JSON");
+    expect(strict.warnings).toContain("json-ld[0]: a block was left out: it is not JSON");
     const fixed = PAGE.replace(`"EUR"},}`, `"EUR"}}`);
     const ok = extractStructured(fixed, { url: "https://v.example/agenda", lenient: false, microdata: false, microformats: false });
     expect(ok.warnings).toEqual([]);
@@ -80,5 +80,21 @@ describe("raw JSON-LD", () => {
     expect(lenient).toEqual([{ "@type": "Event", name: "A" }, { "@type": "Event", name: "B" }, null, { "@type": "Event", name: "C" }]);
     const strict = extractStructured(page, { raw: true, lenient: false }).raw!.jsonLd;
     expect(strict).toEqual([{ "@type": "Event", name: "A" }, null, null, { "@type": "Event", name: "C" }]);
+  });
+
+  it("says which block was repaired", () => {
+    const s = extractStructured(
+      `<script type="application/ld+json">{"a":1}</script><script type="application/ld+json">{"b":2,}</script>`,
+      { raw: true },
+    );
+    expect(s.warnings).toEqual(["json-ld[1]: trailing commas"]);
+    expect(s.raw!.jsonLdRepaired).toEqual([1]);
+    // Repaired twice over, named once a repair; a block read as it is, not at all.
+    const twice = extractStructured(
+      `<script type="application/ld+json">{"a":[1,],}</script><script type="application/ld+json">{"b":2}</script>`,
+      { raw: true },
+    );
+    expect(twice.warnings).toEqual(["json-ld[0]: trailing commas"]);
+    expect(twice.raw!.jsonLdRepaired).toEqual([0]);
   });
 });

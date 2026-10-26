@@ -136,6 +136,8 @@ export interface NativePageOptions {
   maxHeadings?: number;
   maxText?: number;
   maxEmbedded?: number;
+  text?: boolean;
+  maxTextBytes?: number;
 }
 
 export interface NativeOutput {
@@ -174,6 +176,9 @@ export function setCallLimit(limit?: number | null): void;
 /** Whether this build reads pest grammars (the `grammar` feature). */
 export function hasGrammars(): boolean;
 export function templateHash(pages: string[][]): string | null;
+export function registrableDomain(host: string): string | null;
+export function publicSuffix(host: string): string | null;
+export function publicSuffixListVersion(): string;
 
 export class NativeRobots {
   constructor(text: string, token: string);

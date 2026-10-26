@@ -374,3 +374,56 @@ fn a_script_past_max_script_bytes_is_not_read_at_all() {
         p.warnings
     );
 }
+
+#[test]
+fn the_pages_text_a_line_per_block() {
+    let x = Extractor::new(
+        &json!({ "t": { "select": "main", "text": "lines" } }),
+        &Default::default(),
+        ExtractorOptions {
+            page: Some(PageOptions {
+                text: true,
+                ..PageOptions::default()
+            }),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    let html = "<html><head><title>Agenda</title><style>p{}</style><script>if (a<b) {}</script></head><body>\
+        <h1>Title</h1>\n<p>One &amp; <b>Nora</b>s\n two</p><ul><li>a</li><li>b<br>c</li></ul>\
+        <table><tr><td>Fri</td><td>20:00</td></tr></table><noscript>no</noscript><template><p>no</p></template>\
+        <main><p>x</p></main></body></html>";
+    let whole = x.extract(html.as_bytes(), None);
+    let want = "Title\nOne & Noras two\na\nb\nc\nFri 20:00\nx";
+    assert_eq!(whole.page.as_ref().unwrap().text.as_deref(), Some(want));
+    assert_eq!(whole.data.to_json(), json!({ "t": "x" }));
+    for size in [1, 2, 7, 64] {
+        let mut s = x.session(None);
+        for c in html.as_bytes().chunks(size) {
+            s.write(c);
+        }
+        assert_eq!(s.finish().page.unwrap().text.as_deref(), Some(want), "chunks of {size}");
+    }
+    // Off by default; cut at max_text_bytes, with a warning.
+    assert_eq!(page(html).text, None);
+    let x = Extractor::new(
+        &json!({}),
+        &Default::default(),
+        ExtractorOptions {
+            page: Some(PageOptions {
+                text: true,
+                max_text_bytes: 8,
+                ..PageOptions::default()
+            }),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    let p = x.extract(html.as_bytes(), None).page.unwrap();
+    assert_eq!(p.text.as_deref(), Some("Title"));
+    assert!(
+        p.warnings.iter().any(|w| w.contains("max_text_bytes")),
+        "{:?}",
+        p.warnings
+    );
+}

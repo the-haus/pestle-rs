@@ -1,4 +1,4 @@
-# Crawling: robots.txt, sitemaps and routes
+# Crawling: robots.txt, sitemaps, routes and registrable domains
 
 [`examples/crawl.ts`](../crates/bindings/pestle-node/examples/crawl.ts) puts
 both together: read a site's robots.txt, follow its sitemaps as they stream
@@ -60,6 +60,28 @@ for await (const entry of parseSitemap(await fetch(url))) {
   throws `NotASitemap`.
 - `readSitemap(body)` reads one whole (`{ format, entries, gzip,
   warnings }`), `readSitemapAsync(body)` on the thread pool.
+
+## Registrable domains
+
+Which pages are the site's own, and which its ticket shop's: by the
+registrable domain of each URL's host, from the Public Suffix List bundled
+with pestle (its ICANN and private sections, as browsers read them;
+`PUBLIC_SUFFIX_LIST_VERSION` says when it was taken):
+
+```ts
+import { publicSuffix, registrableDomain } from "@pestle-rs/node";
+
+registrableDomain("tickets.example.com.mx"); // "example.com.mx"
+registrableDomain("foo.github.io");          // "foo.github.io": github.io's sites are each their own
+registrableDomain("www.café.example");       // "xn--caf-dma.example": IDNs by their punycode
+publicSuffix("www.example.co.uk");           // "co.uk"
+```
+
+A host that is a public suffix (`co.uk`) is its own registrable domain (the
+list's own tests say `null` there), as is an IP address (`publicSuffix` of
+one is `null`); what is no host (`.com`, `a..b`) is `null`. In Rust:
+`pestle_html::psl`. The list's own test file is part of the test suite;
+`scripts/update-psl.sh` takes a newer list.
 
 ## Routes
 

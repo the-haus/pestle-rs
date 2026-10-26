@@ -79,6 +79,48 @@ describe("Extractor", () => {
     expect(s.take()).toEqual([{ field: "events", value: { t: "A" } }]);
   });
 
+  it("matches a field's selector in the page, under its scope (P-6)", () => {
+    const html = `<section class="card"><h3>Friday</h3></section>`;
+    expect(new Extractor({ items: [{ select: ".card", fields: { t: ".card h3" } }] }).extract(html).data).toEqual({ items: [{ t: "Friday" }] });
+    const nested = `<section><ul><li><b>A</b></li></ul></section><ul><li><b>B</b></li></ul>`;
+    const x = new Extractor({ rows: [{ select: "li", fields: { s: "section b", own: ":scope b", up: ":scope section b" } }] });
+    expect(x.extract(nested).data).toEqual({ rows: [{ s: "A", own: "A", up: null }, { s: null, own: "B", up: null }] });
+  });
+
+  it("reads the nearest value above a row (P-7), whole and streamed", async () => {
+    const html = `<section data-day="fri"><ul><li class="set"><b>A</b></li></ul></section>`;
+    const x = new Extractor({ rows: [{ select: "li.set", fields: { act: "b", day: { select: "section@data-day", closest: true } } }] });
+    const want = { rows: [{ act: "A", day: "fri" }] };
+    expect(x.extract(html).data).toEqual(want);
+    expect((await x.stream(html.split(""))).data).toEqual(want);
+    const s = x.session();
+    for (const c of html.match(/.{1,3}/gs)!) s.write(c);
+    expect(s.end().data).toEqual(want);
+    const timetable = `<div><h3>Fri</h3><ul><li>A</li><li>B</li></ul></div><div><ul><li>C</li></ul><h3>Sat</h3></div>`;
+    const t = new Extractor({ sets: { select: "li", all: true, emit: true, fields: { act: { text: "own" }, day: { select: "h3", closest: { depth: 2 } } } } });
+    const seen: Item[] = [];
+    await t.stream([timetable], { onItem: (i) => seen.push(i) });
+    expect(seen.map((i) => i.value)).toEqual([
+      { act: "A", day: "Fri" },
+      { act: "B", day: "Fri" },
+      { act: "C", day: "Sat" },
+    ]);
+    expect(() => new Extractor({ d: { select: "h3", closest: true } })).toThrow(/under a scope/);
+  });
+
+  it("reads text as lines (P-8), in a field and as the page's", async () => {
+    const html = "<body><h1>Title</h1><p>One</p><ul><li>a</li><li>b</li></ul></body>";
+    expect(new Extractor({ t: "body" }).extract(html).data).toEqual({ t: "Title One a b" });
+    const lines = new Extractor({ t: { select: "body", text: "lines" } }, { page: { text: true } });
+    const out = lines.extract(html);
+    expect(out.data).toEqual({ t: "Title\nOne\na\nb" });
+    expect(out.page!.text).toBe("Title\nOne\na\nb");
+    const streamed = await lines.stream(html.split(""));
+    expect(streamed.data).toEqual(out.data);
+    expect(streamed.page!.text).toBe(out.page!.text);
+    expect(new Extractor({}, { page: true }).extract(html).page!.text).toBeUndefined();
+  });
+
   it("reports what does not compile, or leaves it out", () => {
     expect(() => new Extractor({ a: "li:hover" })).toThrow(SpecError);
     if (hasGrammars()) {

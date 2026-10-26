@@ -13,12 +13,14 @@ import { Extractor, skeleton, strip } from "../ts/index.js";
 import {
   cleanForLearn,
   collapse,
+  is,
   messyHtml,
   parse,
   random,
   select,
   skeletonPaths,
   textOf,
+  type El,
 } from "./reference.js";
 
 const FIXTURES = join(__dirname, "..", "..", "..", "..", "fixtures", "sites");
@@ -87,14 +89,16 @@ describe("matches what css-select matches on htmlparser2's tree", () => {
     expect(compared).toBeGreaterThan(50_000);
   });
 
-  it("scoped as css-select scopes an element", () => {
-    const fields = ["p", "> p", "li:first-child", "div p", ":scope > *", "a + a"];
+  it("scoped as querySelectorAll scopes an element (css-select without relative selectors)", () => {
+    // Matched in the page's context; one that starts at the scope (`> p`, `:scope`) as css-select reads it.
+    const fields = ["p", "> p", "li:first-child", "div p", "div > p", "section div p", ":scope > *", ":scope p", "a + a", "li ~ li a"];
     for (let seed = 500; seed < 600; seed++) {
       const html = messyHtml(random(seed));
       const doc = parse(html);
       for (const field of fields) {
+        const fromScope = field.startsWith(">") || field.includes(":scope");
         const want = select(doc, "div").map((scope) =>
-          select(scope, field)
+          select(scope, field, !fromScope)
             .map((el) => el.attribs["data-n"])
             .filter((n): n is string => n !== undefined),
         );
@@ -105,6 +109,55 @@ describe("matches what css-select matches on htmlparser2's tree", () => {
         }
       }
     }
+  });
+});
+
+describe("closest reads as festimap's closestFields does", () => {
+  /** The nearest value: under the row, else under or on its ancestors (each its first match, else itself). */
+  function closest(row: El, selector: string, attr: string, depth: number): string | null {
+    const valued = (els: El[]) => els.find((el) => el.attribs[attr] !== undefined)?.attribs[attr] ?? null;
+    const under = valued(select(row, selector, true));
+    if (under !== null) return under;
+    let at: El | null = row;
+    for (let k = 1; k <= depth; k++) {
+      const parent: unknown = at?.parent;
+      if (!parent || !(parent as El).attribs) return null;
+      at = parent as El;
+      const found = valued(select(at, selector, true)) ?? (is(at, selector) ? valued([at]) : null);
+      if (found !== null) return found;
+    }
+    return null;
+  }
+
+  it("on random broken documents, whole and streamed", async () => {
+    let compared = 0;
+    for (let seed = 2000; seed < 2150; seed++) {
+      const html = messyHtml(random(seed));
+      const doc = parse(html);
+      for (const [rows, selector, depth] of [
+        ["li", ".b, .c", 8],
+        ["td, li", "[data-v]", 3],
+        ["p", "h1, h2", 2],
+        ["div", ".Event", 8],
+      ] as const) {
+        const want = select(doc, rows).map((row) => ({
+          n: row.attribs["data-n"] ?? null,
+          v: closest(row, selector, "id", depth),
+        }));
+        const x = new Extractor({
+          r: { select: rows, all: true, fields: { n: { attr: "data-n" }, v: { select: selector, attr: "id", closest: { depth } } } },
+        });
+        const got = x.extract(html).data.r;
+        if (JSON.stringify(got) !== JSON.stringify(want)) {
+          throw new Error(`seed ${seed}, ${rows} → ${selector} (${depth})\nwant ${JSON.stringify(want)}\ngot  ${JSON.stringify(got)}\n${html}`);
+        }
+        const bytes = new TextEncoder().encode(html);
+        const pieces = Array.from({ length: Math.ceil(bytes.length / 5) }, (_, i) => bytes.subarray(i * 5, i * 5 + 5));
+        expect((await x.stream(pieces)).data.r, `seed ${seed} streamed`).toEqual(want);
+        compared += want.filter((w) => w.v !== null).length;
+      }
+    }
+    expect(compared).toBeGreaterThan(1000);
   });
 });
 

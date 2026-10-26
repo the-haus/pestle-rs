@@ -59,7 +59,7 @@ is one event, its formats listed in `formats`.
 
 | on the page | read as |
 | --- | --- |
-| broken JSON: trailing or missing commas, comments, single quotes, “smart quotes”, unquoted keys and values (`url: https://…`, `width:3px`), `True`/`None`/`NaN`, raw newlines, unescaped `"` inside text, entity-escaped or CDATA- or comment-wrapped blocks, truncated blocks, several objects glued together | the JSON meant (each repair listed in `warnings`) |
+| broken JSON: trailing or missing commas, comments, single quotes, “smart quotes”, unquoted keys and values (`url: https://…`, `width:3px`), `True`/`None`/`NaN`, raw newlines, unescaped `"` inside text, entity-escaped or CDATA- or comment-wrapped blocks, truncated blocks, several objects glued together | the JSON meant (each repair listed in `warnings` with its block's index in `raw.jsonLd`, `json-ld[1]: trailing commas`; `raw.jsonLdRepaired` lists the blocks repaired) |
 | `text/ld+json`, `application/json+ld`, a type with a charset | JSON-LD |
 | `@context` missing, `http`/`https`, trailing `/`, `schema.org`, the docs URL, `{ "@vocab": … }`; `type`/`id` without `@`; `schema:` or full-IRI names | schema.org |
 | names in the wrong case or style: `musicevent`, `Start_Date`, `door time`, `Music Event` | `MusicEvent`, `startDate`, `doorTime` |
@@ -99,8 +99,8 @@ The JSON-LD tests out of scope are those for JSON-LD 1.0 processing mode,
 `rdfDirection`, generalized RDF and `expandContext`. In strict mode only
 schema.org's context is known (built in); nothing is fetched, so a block with
 another remote context is left out, as is any block that is not valid
-JSON-LD. Either way `warnings` names the spec's error code (`json-ld: a block
-was left out: invalid @id value`). Graphs are compared after RDFC-1.0
+JSON-LD. Either way `warnings` names the block and the spec's error code
+(`json-ld[0]: a block was left out: invalid @id value`). Graphs are compared after RDFC-1.0
 canonicalization.
 
 The one microformats case pestle fails, `value-dt`, expects a timezone as

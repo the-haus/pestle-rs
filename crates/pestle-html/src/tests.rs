@@ -488,3 +488,6 @@ fn deep_and_hostile_input_stays_bounded() {
         &junk,
     );
 }
+
+#[path = "tests_scope.rs"]
+mod scope;

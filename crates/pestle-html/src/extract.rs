@@ -7,6 +7,13 @@
 //! on something only the rest of the document can tell (`:has()`,
 //! `:last-child`, …) holds its place, so values keep document order, and
 //! is settled when its element or its parent closes.
+//!
+//! A `closest` field that finds nothing under its scope reads the scope's
+//! ancestors, nearest first: the first match under each, else the ancestor
+//! itself. Every element its selector matches anywhere is read as a
+//! candidate, and each open element knows where its candidates start; what
+//! an ancestor holds is known for sure only when it closes (a match may yet
+//! come), so until then the object waits, parked, in its place.
 
 use std::sync::Arc;
 
@@ -24,6 +31,15 @@ enum Slot {
     Waiting,
     Value(Value),
     Dead,
+}
+
+/// Where a capture's value goes.
+#[derive(Clone, Copy)]
+enum Target {
+    /// A slot of an open instance's field.
+    Slot { instance: usize, field: usize, slot: usize },
+    /// A candidate of a `closest` field's track.
+    Cand { track: usize, cand: usize },
 }
 
 /// One open scope: an object being filled.
@@ -49,13 +65,16 @@ impl Instance {
             emitted: smallvec::smallvec![0; n],
         }
     }
+
+    /// Whether an object parked inside it is still to come.
+    fn waits(&self) -> bool {
+        self.slots.iter().flatten().any(|s| matches!(s, Slot::Waiting))
+    }
 }
 
 /// A match being read.
 struct Capture {
-    instance: usize,
-    field: usize,
-    slot: usize,
+    target: Target,
     /// The matched element's frame.
     depth: usize,
     text: String,
@@ -83,6 +102,8 @@ struct Capture {
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Mode {
     Visible,
+    /// Visible text, a line per block.
+    Lines,
     Raw,
     Own,
     /// No text (an attribute, markup, existence).
@@ -99,7 +120,84 @@ struct SiblingWait {
     index: u32,
     type_index: u32,
     name: String,
-    value: Value,
+    value: Held,
+}
+
+/// A value read, or an object still waiting on a `closest` field (its [`Engine::parked`] entry).
+enum Held {
+    Ready(Value),
+    Parked(usize),
+}
+
+/// What holds the slot a parked object's value goes to.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Owner {
+    Instance(usize),
+    Parked(usize),
+}
+
+/// An object whose scope closed with values still to come: a `closest` field waiting on an
+/// ancestor, or an object of its own parked.
+struct Parked {
+    inst: Instance,
+    /// How many values are still to come.
+    pending: usize,
+    owner: Owner,
+    field: usize,
+    slot: usize,
+    /// No sibling condition holds it back (or it held): its value goes as soon as it is complete.
+    released: bool,
+    /// A condition failed, or what it goes into was dropped: its value goes nowhere.
+    discarded: bool,
+    /// Complete, waiting on its sibling conditions.
+    done: Option<Value>,
+}
+
+/// A `closest` field waiting on the ancestor at frame `cur` to close.
+struct Lookup {
+    parked: usize,
+    field: usize,
+    track: usize,
+    cur: usize,
+    /// The farthest ancestor it may read (a frame).
+    min: usize,
+}
+
+/// What a `closest` field's selector matched anywhere, as the page is read.
+#[derive(Default)]
+struct Track {
+    /// Each match's value (once its element closed), in page order. When an element closes,
+    /// only the first value among the matches inside it is kept: no ancestor reads past it.
+    cands: Vec<Slot>,
+    /// Per open element: where the candidates inside it start, and whether it is one itself
+    /// (the one just before).
+    frames: Vec<(usize, bool)>,
+}
+
+impl Track {
+    /// The first value under the element at `frame`, when it is sure: none before it waits.
+    /// None too when nothing has one (yet).
+    fn first(&self, frame: usize) -> Option<&Value> {
+        for slot in &self.cands[self.frames[frame].0..] {
+            match slot {
+                Slot::Value(v) => return Some(v),
+                Slot::Waiting => return None,
+                Slot::Dead => {}
+            }
+        }
+        None
+    }
+
+    /// The element at `frame` itself, when it is a candidate with a value.
+    fn own(&self, frame: usize) -> Option<&Value> {
+        match self.frames[frame] {
+            (start, true) => match &self.cands[start - 1] {
+                Slot::Value(v) => Some(v),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
 }
 
 /// The extraction pass.
@@ -108,6 +206,14 @@ pub(crate) struct Engine {
     instances: Vec<Instance>,
     captures: Vec<Capture>,
     waits: Vec<SiblingWait>,
+    tracks: Vec<Track>,
+    /// Objects waiting on a `closest` field (`None`: a free entry).
+    parked: Vec<Option<Parked>>,
+    free: Vec<usize>,
+    /// Waiting `closest` fields, by the frame they wait on (outermost first).
+    lookups: Vec<Lookup>,
+    /// Lookups made while an element closes, joining `lookups` after it closed.
+    fresh: Vec<Lookup>,
     page: Option<Url>,
     base: Option<Url>,
     base_seen: bool,
@@ -132,11 +238,17 @@ impl Engine {
             .any(|f| matches!(f.read, Read::Html));
         let root = Instance::new(&spec, 0, None);
         let emits = spec.objects[0].fields.iter().any(|f| f.emit);
+        let tracks = spec.tracks.iter().map(|_| Track::default()).collect();
         Engine {
             spec,
             instances: vec![root],
             captures: Vec::new(),
             waits: Vec::new(),
+            tracks,
+            parked: Vec::new(),
+            free: Vec::new(),
+            lookups: Vec::new(),
+            fresh: Vec::new(),
             base: page.clone(),
             page,
             base_seen: false,
@@ -160,6 +272,18 @@ impl Engine {
         &self.spec.objects[self.instances[instance].def].fields[field]
     }
 
+    /// The field a capture reads for.
+    fn def_of<'s>(&self, target: Target) -> &'s FieldDef {
+        let spec = self.spec();
+        match target {
+            Target::Slot { instance, field, .. } => &spec.objects[self.instances[instance].def].fields[field],
+            Target::Cand { track, .. } => {
+                let t = &spec.tracks[track];
+                &spec.objects[t.object].fields[t.field]
+            }
+        }
+    }
+
     /// Items of emitted fields completed since the last call.
     pub(crate) fn take(&mut self) -> Vec<(String, Value)> {
         std::mem::take(&mut self.emitted)
@@ -169,6 +293,11 @@ impl Engine {
     pub(crate) fn finish(&mut self, tree: &Tree) -> Value {
         while let Some(w) = self.waits.pop() {
             self.settle(w, tree);
+        }
+        // Every element has closed, and every lookup with it; none is left but by a bug.
+        self.lookups.append(&mut self.fresh);
+        while let Some(l) = self.lookups.pop() {
+            self.fill(l.parked, l.field, None);
         }
         self.drain_emitted();
         let root = self.instances.swap_remove(0);
@@ -189,6 +318,25 @@ impl Engine {
         {
             inst.done[field] = true;
         }
+        let cap = self.capture(Target::Slot { instance, field, slot }, def, alts, tree, depth);
+        self.captures.push(cap);
+        if let Some(object) = def.object {
+            let child = self.instances.len();
+            self.instances.push(Instance::new(spec, object, Some(depth)));
+            if let Some(cap) = self.captures.last_mut() {
+                cap.child = Some(child);
+            }
+            // Fields of the element itself.
+            for (i, f) in spec.objects[object].fields.iter().enumerate() {
+                if f.selector.is_none() {
+                    self.start(child, i, Matched::new(), tree, depth);
+                }
+            }
+        }
+    }
+
+    /// A capture of the element at `depth` for `def`.
+    fn capture(&self, target: Target, def: &FieldDef, alts: Matched, tree: &Tree, depth: usize) -> Capture {
         let waits = def
             .selector
             .as_ref()
@@ -203,10 +351,8 @@ impl Engine {
                 .as_ref()
                 .is_some_and(|sel| alts.iter().any(|&a| !sel.deferred(a).contains.is_empty()));
         let el = &tree.frames[depth].el;
-        self.captures.push(Capture {
-            instance,
-            field,
-            slot,
+        Capture {
+            target,
             depth,
             text: String::new(),
             skip: None,
@@ -228,22 +374,23 @@ impl Engine {
             html_full: false,
             mode: match def.read {
                 Read::Visible => Mode::Visible,
+                Read::Lines => Mode::Lines,
                 Read::Raw => Mode::Raw,
                 Read::Own => Mode::Own,
                 _ => Mode::None,
             },
-        });
-        if let Some(object) = def.object {
-            let child = self.instances.len();
-            self.instances.push(Instance::new(spec, object, Some(depth)));
-            if let Some(cap) = self.captures.last_mut() {
-                cap.child = Some(child);
-            }
-            // Fields of the element itself.
-            for (i, f) in spec.objects[object].fields.iter().enumerate() {
-                if f.selector.is_none() {
-                    self.start(child, i, Matched::new(), tree, depth);
-                }
+        }
+    }
+
+    /// A capture's value (none: no value) into where it goes.
+    fn put(&mut self, target: Target, value: Option<Value>) {
+        match target {
+            Target::Slot { instance, field, slot } => self.resolve(instance, field, slot, value),
+            Target::Cand { track, cand } => {
+                self.tracks[track].cands[cand] = match value {
+                    Some(v) => Slot::Value(v),
+                    None => Slot::Dead,
+                };
             }
         }
     }
@@ -329,15 +476,7 @@ impl Engine {
     }
 
     fn close_capture(&mut self, mut cap: Capture, tree: &Tree) {
-        let spec = self.spec();
-        let def = &spec.objects[self.instances[cap.instance].def].fields[cap.field];
-        let object = cap.child.map(|_| {
-            let child = self
-                .instances
-                .pop()
-                .expect("a capture's object is the innermost instance");
-            self.object(child)
-        });
+        let def = self.def_of(cap.target);
         if cap.waits {
             let sel = def.selector.as_ref().expect("only a selector waits");
             let alts = std::mem::take(&mut cap.alts);
@@ -360,18 +499,30 @@ impl Engine {
                 .map(|(_, a)| a)
                 .collect();
             if cap.alts.is_empty() {
-                self.resolve(cap.instance, cap.field, cap.slot, None);
+                if cap.child.is_some() {
+                    let dropped = self.instances.pop();
+                    if dropped.is_some_and(|i| i.waits()) {
+                        self.redirect(self.instances.len(), None);
+                    }
+                }
+                self.put(cap.target, None);
                 return;
             }
         }
-        let value = match object {
-            Some(o) => Some(o),
+        let held = match cap.child {
+            Some(_) => {
+                let child = self
+                    .instances
+                    .pop()
+                    .expect("a capture's object is the innermost instance");
+                self.complete(child, cap.target, cap.depth)
+            }
             None => {
                 let raw = match def.read {
                     Read::Attr(_) => cap.attr.take(),
                     Read::Html => cap.html.take(),
                     Read::Exists => Some(String::new()),
-                    Read::Visible | Read::Raw | Read::Own => Some(std::mem::take(&mut cap.text)),
+                    Read::Visible | Read::Lines | Read::Raw | Read::Own => Some(std::mem::take(&mut cap.text)),
                 };
                 let cx = Context {
                     base: self.base.as_ref(),
@@ -381,30 +532,198 @@ impl Engine {
                 for e in errors {
                     self.error(e);
                 }
-                v
+                match v {
+                    Some(v) => Held::Ready(v),
+                    None => {
+                        self.put(cap.target, None);
+                        return;
+                    }
+                }
             }
-        };
-        let Some(value) = value else {
-            self.resolve(cap.instance, cap.field, cap.slot, None);
-            return;
         };
         let sel = def.selector.as_ref();
         if cap.waits && sel.is_some_and(|sel| !cap.alts.iter().any(|&a| sel.deferred(a).siblings.is_empty())) {
+            let Target::Slot { instance, field, slot } = cap.target else {
+                unreachable!("a closest field's selector waits on no sibling")
+            };
             let frame = &tree.frames[cap.depth];
             self.waits.push(SiblingWait {
                 parent: cap.depth.checked_sub(1),
-                instance: cap.instance,
-                field: cap.field,
-                slot: cap.slot,
+                instance,
+                field,
+                slot,
                 alts: cap.alts,
                 index: frame.index,
                 type_index: frame.type_index,
                 name: frame.el.name().to_owned(),
-                value,
+                value: held,
             });
             return;
         }
-        self.resolve(cap.instance, cap.field, cap.slot, Some(value));
+        match held {
+            Held::Ready(v) => self.put(cap.target, Some(v)),
+            Held::Parked(p) => self.release(p),
+        }
+    }
+
+    /// The object of an instance whose scope closed at frame `depth`, or, when a `closest` field
+    /// or an object inside it is still to come, its entry in [`Engine::parked`].
+    fn complete(&mut self, mut inst: Instance, target: Target, depth: usize) -> Held {
+        let spec = self.spec();
+        // Its index while it was open.
+        let index = self.instances.len();
+        let mut lookups: SmallVec<[Lookup; 2]> = SmallVec::new();
+        for (f, def) in spec.objects[inst.def].fields.iter().enumerate() {
+            let Some(c) = &def.closest else { continue };
+            if depth == 0 || inst.slots[f].iter().any(|s| matches!(s, Slot::Value(_))) {
+                continue;
+            }
+            // The parent is open: what it holds so far settles it only if it has a value.
+            match self.tracks[c.track].first(depth - 1) {
+                Some(v) => inst.slots[f].push(Slot::Value(v.clone())),
+                None => lookups.push(Lookup {
+                    parked: usize::MAX,
+                    field: f,
+                    track: c.track,
+                    cur: depth - 1,
+                    min: depth.saturating_sub(c.depth),
+                }),
+            }
+        }
+        let waiting = inst
+            .slots
+            .iter()
+            .flatten()
+            .filter(|s| matches!(s, Slot::Waiting))
+            .count();
+        if waiting == 0 && lookups.is_empty() {
+            return Held::Ready(self.object(inst));
+        }
+        let Target::Slot { instance, field, slot } = target else {
+            unreachable!("a candidate holds no object")
+        };
+        let entry = Parked {
+            inst,
+            pending: waiting + lookups.len(),
+            owner: Owner::Instance(instance),
+            field,
+            slot,
+            released: false,
+            discarded: false,
+            done: None,
+        };
+        let id = match self.free.pop() {
+            Some(id) => {
+                self.parked[id] = Some(entry);
+                id
+            }
+            None => {
+                self.parked.push(Some(entry));
+                self.parked.len() - 1
+            }
+        };
+        if waiting > 0 {
+            self.redirect(index, Some(id));
+        }
+        for mut l in lookups {
+            l.parked = id;
+            self.fresh.push(l);
+        }
+        Held::Parked(id)
+    }
+
+    /// Parked objects that go into the instance at `index`, which closed: into its parked
+    /// entry now (`to`), or nowhere.
+    fn redirect(&mut self, index: usize, to: Option<usize>) {
+        for p in self.parked.iter_mut().flatten() {
+            if p.owner == Owner::Instance(index) {
+                match to {
+                    Some(id) => p.owner = Owner::Parked(id),
+                    None => p.discarded = true,
+                }
+            }
+        }
+    }
+
+    /// A parked object's conditions held: its value goes as soon as it is complete.
+    fn release(&mut self, id: usize) {
+        let Some(p) = self.parked[id].as_mut() else { return };
+        match p.done.take() {
+            Some(v) => {
+                let (owner, field, slot) = (p.owner, p.field, p.slot);
+                self.unpark(id);
+                self.deliver(owner, field, slot, Some(v));
+            }
+            None => p.released = true,
+        }
+    }
+
+    /// A parked object's conditions failed: its value goes nowhere.
+    fn discard(&mut self, id: usize) {
+        let Some(p) = self.parked[id].as_mut() else { return };
+        if p.done.is_some() {
+            self.unpark(id);
+        } else {
+            p.discarded = true;
+        }
+    }
+
+    fn unpark(&mut self, id: usize) {
+        self.parked[id] = None;
+        self.free.push(id);
+    }
+
+    /// A value still to come of a parked object, for its field (a `closest` one).
+    fn fill(&mut self, id: usize, field: usize, value: Option<Value>) {
+        let Some(p) = self.parked[id].as_mut() else { return };
+        if let Some(v) = value {
+            p.inst.slots[field].push(Slot::Value(v));
+        }
+        self.arrived(id);
+    }
+
+    /// One of the values a parked object waits on arrived.
+    fn arrived(&mut self, id: usize) {
+        let Some(p) = self.parked[id].as_mut() else { return };
+        p.pending -= 1;
+        if p.pending > 0 {
+            return;
+        }
+        let inst = std::mem::replace(
+            &mut p.inst,
+            Instance {
+                def: 0,
+                depth: None,
+                slots: SmallVec::new(),
+                done: SmallVec::new(),
+                emitted: SmallVec::new(),
+            },
+        );
+        let (discarded, released, owner, field, slot) = (p.discarded, p.released, p.owner, p.field, p.slot);
+        let value = self.object(inst);
+        if discarded {
+            self.unpark(id);
+        } else if released {
+            self.unpark(id);
+            self.deliver(owner, field, slot, Some(value));
+        } else if let Some(p) = self.parked[id].as_mut() {
+            p.done = Some(value);
+        }
+    }
+
+    /// A parked object's value into its slot.
+    fn deliver(&mut self, owner: Owner, field: usize, slot: usize, value: Option<Value>) {
+        match owner {
+            Owner::Instance(i) => self.resolve(i, field, slot, value),
+            Owner::Parked(id) => {
+                let Some(p) = self.parked[id].as_mut() else { return };
+                p.inst.slots[field][slot] = match value {
+                    Some(v) => Slot::Value(v),
+                    None => Slot::Dead,
+                };
+                self.arrived(id);
+            }
+        }
     }
 
     fn settle(&mut self, w: SiblingWait, tree: &Tree) {
@@ -420,7 +739,38 @@ impl Engine {
                     .all(|c| c.holds(w.index, w.type_index, count, type_count))
             })
         });
-        self.resolve(w.instance, w.field, w.slot, holds.then_some(w.value));
+        match (w.value, holds) {
+            (Held::Ready(v), true) => self.resolve(w.instance, w.field, w.slot, Some(v)),
+            (Held::Ready(_), false) => self.resolve(w.instance, w.field, w.slot, None),
+            (Held::Parked(id), true) => self.release(id),
+            (Held::Parked(id), false) => {
+                self.discard(id);
+                self.resolve(w.instance, w.field, w.slot, None);
+            }
+        }
+    }
+
+    /// The `closest` fields waiting on the element at frame `d`, which closed: settled by what
+    /// it holds or is, else passed on to its parent.
+    fn lookups_at(&mut self, d: usize) {
+        let mut moved = Vec::new();
+        while self.lookups.last().is_some_and(|l| l.cur == d) {
+            let Some(mut l) = self.lookups.pop() else { break };
+            let track = &self.tracks[l.track];
+            let mut value = track.first(d).or_else(|| track.own(d)).cloned();
+            if value.is_none() && d > l.min {
+                l.cur = d - 1;
+                value = self.tracks[l.track].first(d - 1).cloned();
+                if value.is_none() {
+                    moved.push(l);
+                    continue;
+                }
+            }
+            self.fill(l.parked, l.field, value);
+        }
+        // All of them wait on the parent now: still outermost first.
+        self.lookups.append(&mut moved);
+        self.lookups.append(&mut self.fresh);
     }
 
     fn error(&mut self, e: String) {
@@ -471,11 +821,11 @@ impl Handler for Engine {
         let mut checks = Vec::new();
         for (ci, cap) in self.captures.iter_mut().enumerate() {
             cap.nonempty = true;
-            if cap.mode == Mode::Visible && cap.skip.is_none() {
+            if matches!(cap.mode, Mode::Visible | Mode::Lines) && cap.skip.is_none() {
                 if crate::tags::is_never_text(el.kind) {
                     cap.skip = Some(d);
-                } else if !crate::tags::is_inline(el.kind) {
-                    Self::push_text(cap, " ", max);
+                } else if let Some(c) = crate::tags::text_break(el.kind, cap.mode == Mode::Lines) {
+                    Self::push_text(cap, if c == '\n' { "\n" } else { " " }, max);
                 }
             }
             if !cap.has.is_empty() {
@@ -485,7 +835,7 @@ impl Handler for Engine {
         // Something inside a match waiting on `:has()`.
         for ci in checks {
             let cap = &self.captures[ci];
-            let def = &spec.objects[self.instances[cap.instance].def].fields[cap.field];
+            let def = self.def_of(cap.target);
             let Some(sel) = &def.selector else { continue };
             let mut found = Vec::new();
             for (i, &a) in cap.alts.iter().enumerate() {
@@ -518,6 +868,20 @@ impl Handler for Engine {
                 }
             }
         }
+        // `closest` fields' matches anywhere, and where this element's start.
+        for (t, track) in spec.tracks.iter().enumerate() {
+            let alts = track.selector.matches(tree, None);
+            let own = !alts.is_empty();
+            if own {
+                let cand = self.tracks[t].cands.len();
+                self.tracks[t].cands.push(Slot::Waiting);
+                let def = &spec.objects[track.object].fields[track.field];
+                let cap = self.capture(Target::Cand { track: t, cand }, def, alts, tree, d);
+                self.captures.push(cap);
+            }
+            let start = self.tracks[t].cands.len();
+            self.tracks[t].frames.push((start, own));
+        }
     }
 
     fn close(&mut self, tree: &Tree) {
@@ -535,8 +899,24 @@ impl Handler for Engine {
         for cap in &mut self.captures {
             if cap.skip == Some(d) {
                 cap.skip = None;
-            } else if cap.skip.is_none() && cap.mode == Mode::Visible && !crate::tags::is_inline(kind) {
-                Self::push_text(cap, " ", max);
+            } else if cap.skip.is_none() && matches!(cap.mode, Mode::Visible | Mode::Lines) {
+                if let Some(c) = crate::tags::text_break(kind, cap.mode == Mode::Lines) {
+                    Self::push_text(cap, if c == '\n' { "\n" } else { " " }, max);
+                }
+            }
+        }
+        if self.tracks.is_empty() {
+            return;
+        }
+        self.lookups_at(d);
+        for track in &mut self.tracks {
+            let Some((start, _)) = track.frames.pop() else { continue };
+            // Every match inside has its value now; past the first, no ancestor reads them.
+            let first = track.cands[start..].iter().position(|s| matches!(s, Slot::Value(_)));
+            if track.cands[start..].iter().all(|s| !matches!(s, Slot::Waiting)) {
+                let kept = first.map(|i| std::mem::replace(&mut track.cands[start + i], Slot::Dead));
+                track.cands.truncate(start);
+                track.cands.extend(kept);
             }
         }
     }
@@ -552,6 +932,14 @@ impl Handler for Engine {
         for cap in &mut self.captures {
             match cap.mode {
                 Mode::Visible if cap.skip.is_none() => Self::push_text(cap, text, max),
+                // Its own line breaks are spaces: lines break where blocks do.
+                Mode::Lines if cap.skip.is_none() => {
+                    if text.contains(['\n', '\r']) {
+                        Self::push_text(cap, &text.replace(['\n', '\r'], " "), max);
+                    } else {
+                        Self::push_text(cap, text, max);
+                    }
+                }
                 Mode::Raw => Self::push_text(cap, text, max),
                 Mode::Own if d == cap.depth => Self::push_text(cap, text, max),
                 _ => {}

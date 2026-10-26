@@ -1,6 +1,8 @@
 //! Text as a reader sees it (festimap's `textOf`): whitespace collapsed, a
 //! space where a block element or a `<br>` breaks the run, nothing of
 //! scripts, styles and the other elements whose content is never shown.
+//! Read as lines, a block (a heading, a paragraph, a list item, a table
+//! row) or a `<br>` breaks it with a newline instead.
 
 /// Elements that do not break a run of text (`<b>Nora</b>s` is one word).
 pub fn is_inline(name: &str) -> bool {
@@ -29,6 +31,12 @@ pub fn is_inline(name: &str) -> bool {
             | "var"
             | "wbr"
     )
+}
+
+/// Elements that end a line of text read as lines (`text: "lines"`, the page's `text`): blocks,
+/// headings, list items, table rows, `<br>`. A table's cells share their row's line.
+pub fn breaks_line(name: &str) -> bool {
+    crate::tags::breaks_line(crate::tags::kind(name, crate::tree::tag_hash(name)))
 }
 
 /// Elements whose content is never text a reader sees.
@@ -96,6 +104,21 @@ pub fn collapse(s: &str) -> String {
     out
 }
 
+/// Text read as lines (`\n` where a block breaks it): each line collapsed, empty ones left out.
+pub fn collapse_lines(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for line in s.split('\n') {
+        let line = collapse(line);
+        if !line.is_empty() {
+            if !out.is_empty() {
+                out.push('\n');
+            }
+            out.push_str(&line);
+        }
+    }
+    out
+}
+
 /// At most `max` characters.
 pub fn cut(s: &str, max: usize) -> &str {
     match s.char_indices().nth(max) {
@@ -151,5 +174,13 @@ mod tests {
         assert_eq!(cut_bytes("été", 2), "é");
         assert_eq!(cut_bytes("été", 1), "");
         assert_eq!(cut_bytes("été", 9), "été");
+    }
+
+    #[test]
+    fn lines_collapse_each_line() {
+        assert_eq!(collapse_lines("\n  Title \n\n \n One  two\n"), "Title\nOne two");
+        assert_eq!(collapse_lines(" \n "), "");
+        assert!(breaks_line("li") && breaks_line("tr") && breaks_line("br"));
+        assert!(!breaks_line("td") && !breaks_line("b") && !breaks_line("img"));
     }
 }

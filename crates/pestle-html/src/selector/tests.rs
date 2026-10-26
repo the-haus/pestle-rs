@@ -134,16 +134,30 @@ fn structural_pseudos() {
 }
 
 #[test]
-fn scoped_selectors_are_relative() {
+fn scoped_selectors_match_in_the_page() {
     assert_eq!(select_in(PAGE, "li", Some("l")), ["a", "b", "c", "d"]);
     assert_eq!(select_in(PAGE, "> li.act", Some("l")), ["a", "b", "c"]);
+    // As `querySelectorAll`: elements under the scope, matched against the whole page.
     assert_eq!(
         select_in(PAGE, "main li", Some("l")),
-        Vec::<String>::new(),
-        "main is outside the scope"
+        ["a", "b", "c", "d"],
+        "main is above the scope"
     );
+    assert_eq!(
+        select_in(PAGE, "ul li.act", Some("l")),
+        ["a", "b", "c"],
+        "the scope itself"
+    );
+    assert_eq!(
+        select_in(PAGE, "#l", Some("l")),
+        Vec::<String>::new(),
+        "never the scope"
+    );
+    assert_eq!(select_in(PAGE, ":scope li", Some("l")), ["a", "b", "c", "d"]);
+    assert_eq!(select_in(PAGE, ":scope ul li", Some("l")), Vec::<String>::new());
     assert_eq!(select_in(PAGE, ":scope > h1", Some("m")), ["t"]);
     assert_eq!(select_in(PAGE, "> li", Some("m")), Vec::<String>::new());
+    assert_eq!(select_in(PAGE, "h1 + ul li:first-child", Some("l")), ["a"]);
 }
 
 #[test]

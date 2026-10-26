@@ -37,6 +37,8 @@ tags! {
     SECTION = "section", SELECT = "select", SOURCE = "source", STYLE = "style", SVG = "svg", TABLE = "table",
     TBODY = "tbody", TD = "td", TEMPLATE = "template", TEXTAREA = "textarea", TFOOT = "tfoot", TH = "th",
     THEAD = "thead", TITLE = "title", TR = "tr", TRACK = "track", UL = "ul", WBR = "wbr", XMP = "xmp",
+    CAPTION = "caption", DIALOG = "dialog", HGROUP = "hgroup", LEGEND = "legend", MENU = "menu", SEARCH = "search",
+    SUMMARY = "summary",
 }
 
 const SLOTS: usize = 512;
@@ -84,6 +86,71 @@ pub fn is_inline(kind: u8) -> bool {
             | VAR
             | WBR
     )
+}
+
+/// Elements that end a line of text read as lines (see [`crate::text::breaks_line`]), by kind.
+pub fn breaks_line(kind: u8) -> bool {
+    matches!(
+        kind,
+        ADDRESS
+            | ARTICLE
+            | ASIDE
+            | BLOCKQUOTE
+            | BODY
+            | BR
+            | CAPTION
+            | DD
+            | DETAILS
+            | DIALOG
+            | DIV
+            | DL
+            | DT
+            | FIELDSET
+            | FIGCAPTION
+            | FIGURE
+            | FOOTER
+            | FORM
+            | H1
+            | H2
+            | H3
+            | H4
+            | H5
+            | H6
+            | HEADER
+            | HGROUP
+            | HR
+            | HTML
+            | LEGEND
+            | LI
+            | MAIN
+            | MENU
+            | NAV
+            | OL
+            | OPTION
+            | P
+            | PRE
+            | SEARCH
+            | SECTION
+            | SUMMARY
+            | TABLE
+            | TBODY
+            | TFOOT
+            | THEAD
+            | TR
+            | UL
+    )
+}
+
+/// What an element puts in a run of text where it opens or closes: a line break (`lines`, a
+/// block), a space (any other element but an inline one), or nothing.
+pub fn text_break(kind: u8, lines: bool) -> Option<char> {
+    if lines && breaks_line(kind) {
+        Some('\n')
+    } else if is_inline(kind) {
+        None
+    } else {
+        Some(' ')
+    }
 }
 
 /// Elements whose content is never shown, by kind (see [`crate::text::is_never_text`]).

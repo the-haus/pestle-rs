@@ -4,20 +4,25 @@
  * `cleanForLearn`, from packages/sources/src/sites/dom.ts), copied as they
  * are so the differential tests compare against what festimap runs.
  */
-import { selectAll } from "css-select";
+import { is as matches, selectAll } from "css-select";
 import { DomUtils, ElementType, parseDocument } from "htmlparser2";
 
 export type Doc = ReturnType<typeof parseDocument>;
 type Node = Doc["children"][number];
-type El = Parameters<typeof DomUtils.getAttributeValue>[0];
+export type El = Parameters<typeof DomUtils.getAttributeValue>[0];
 type Text = Extract<Node, { type: typeof ElementType.Text }>;
 
 export const parse = (html: string): Doc => parseDocument(html, { decodeEntities: true, lowerCaseTags: true });
 const isElement = (n: Node): n is El => ElementType.isTag(n);
 const isText = (n: Node): n is Text => n.type === ElementType.Text;
 
-export function select(scope: Node | Node[], selector: string): El[] {
-  return selectAll<Node, El>(selector, scope);
+/** `inPage`: matched in the page's context, as `querySelectorAll` (css-select's `relativeSelector: false`). */
+export function select(scope: Node | Node[], selector: string, inPage = false): El[] {
+  return selectAll<Node, El>(selector, scope, inPage ? { relativeSelector: false } : {});
+}
+
+export function is(el: El, selector: string): boolean {
+  return matches<Node, El>(el, selector);
 }
 
 // ── festimap dom.ts ──────────────────────────────────────────────────────

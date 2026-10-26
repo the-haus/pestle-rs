@@ -35,6 +35,7 @@ const probe = (load: string) => `
       page: [page.title, page.links[0].href],
       scraped: scraped.structured.events[0].name,
       routes: routes.find("https://s.example/e/x-y-z").pattern,
+      domain: [api.registrableDomain("tickets.example.com.mx"), api.publicSuffix("foo.github.io"), api.PUBLIC_SUFFIX_LIST_VERSION.slice(0, 2)],
       aria: api.ariaSnapshot(html).snapshot.split("\\n")[0],
       grammars: api.hasGrammars(),
     }));
@@ -64,13 +65,14 @@ describe.skipIf(!built)("the built package (yarn build:ts)", () => {
       page: ["T", "https://s.example/a"],
       scraped: "E",
       routes: "/e/[slug]",
+      domain: ["example.com.mx", "github.io", "20"],
       aria: '- link "A":',
     });
   });
 
   it("exports every native function and class from both loaders", () => {
     const { native } = esm();
-    for (const name of ["NativeExtractor", "NativeSession", "NativeRobots", "NativeRouteBuilder", "NativeRoutes", "NativeSitemapReader", "readSitemapAsync", "templateHash", "hasGrammars"]) {
+    for (const name of ["NativeExtractor", "NativeSession", "NativeRobots", "NativeRouteBuilder", "NativeRoutes", "NativeSitemapReader", "readSitemapAsync", "templateHash", "hasGrammars", "registrableDomain", "publicSuffix", "publicSuffixListVersion"]) {
       expect(native).toContain(name);
     }
     expect(native).toEqual(cjs().native);

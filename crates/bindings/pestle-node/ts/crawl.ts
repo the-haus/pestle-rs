@@ -1,5 +1,5 @@
-// robots.txt (RFC 9309) and sitemaps (sitemaps.org), read natively: what a
-// crawler asks before and while it reads a site's pages.
+// robots.txt (RFC 9309), sitemaps (sitemaps.org) and the Public Suffix List,
+// read natively: what a crawler asks before and while it reads a site's pages.
 
 import { chunks, type Source } from "./extract.js";
 import * as native from "./native.js";
@@ -55,6 +55,24 @@ export class Robots {
     return new Robots(native.NativeRobots.disallowAll());
   }
 }
+
+/**
+ * A host's registrable domain, by the bundled Public Suffix List (ICANN and private sections, of
+ * {@link PUBLIC_SUFFIX_LIST_VERSION}): `example.com.mx` of `tickets.example.com.mx`,
+ * `foo.github.io` of itself. An IDN comes back as its punycode; a host that is a public suffix
+ * (`co.uk`), or an IP address, is its own; `null` for what is no host (`.com`, `a..b`).
+ */
+export function registrableDomain(host: string): string | null {
+  return native.registrableDomain(host);
+}
+
+/** A host's public suffix (`co.uk` of `www.example.co.uk`, `github.io` of `github.io`); `null` for an IP address or no host. */
+export function publicSuffix(host: string): string | null {
+  return native.publicSuffix(host);
+}
+
+/** The date of the bundled Public Suffix List (`2026-10-22_08-36-41_UTC`). */
+export const PUBLIC_SUFFIX_LIST_VERSION: string = native.publicSuffixListVersion();
 
 /** A robots.txt's rules for `token` (your crawler's product token, `festimapbot`). */
 export function parseRobots(text: string, token: string): Robots {

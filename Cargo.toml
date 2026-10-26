@@ -27,6 +27,7 @@ regex = "1.11"
 serde_json = { version = "1", features = ["preserve_order", "float_roundtrip"] }
 sha2 = "0.10"
 url = "2.5"
+idna = "1.1"
 encoding_rs = "0.8.35"
 flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
 mimalloc = { version = "0.1", default-features = false }
