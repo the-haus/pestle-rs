@@ -26,6 +26,7 @@ const probe = (load: string) => `
     const async = await api.readSitemapAsync('<urlset><url><loc>https://s.example/r</loc></url></urlset>');
     const page = api.extractPage(html, { url: "https://s.example/" });
     const scraped = await api.scrape(html, { url: "https://s.example/" });
+    const routes = api.inferRoutes(["https://s.example/e/a-b-c", "https://s.example/e/d-e-f"]);
     console.log(JSON.stringify({
       api: Object.keys(api).filter((k) => k !== "default" && k !== "__esModule").sort(),
       native: Object.keys(native).filter((k) => k !== "default" && native[k] !== undefined).sort(),
@@ -33,6 +34,7 @@ const probe = (load: string) => `
       sitemap: [sitemap.entries[0].url, entries[0], async.entries[0].url],
       page: [page.title, page.links[0].href],
       scraped: scraped.structured.events[0].name,
+      routes: routes.find("https://s.example/e/x-y-z").pattern,
       aria: api.ariaSnapshot(html).snapshot.split("\\n")[0],
       grammars: api.hasGrammars(),
     }));
@@ -61,13 +63,14 @@ describe.skipIf(!built)("the built package (yarn build:ts)", () => {
       sitemap: ["https://s.example/p", "https://s.example/q", "https://s.example/r"],
       page: ["T", "https://s.example/a"],
       scraped: "E",
+      routes: "/e/[slug]",
       aria: '- link "A":',
     });
   });
 
   it("exports every native function and class from both loaders", () => {
     const { native } = esm();
-    for (const name of ["NativeExtractor", "NativeSession", "NativeRobots", "NativeSitemapReader", "readSitemapAsync", "templateHash", "hasGrammars"]) {
+    for (const name of ["NativeExtractor", "NativeSession", "NativeRobots", "NativeRouteBuilder", "NativeRoutes", "NativeSitemapReader", "readSitemapAsync", "templateHash", "hasGrammars"]) {
       expect(native).toContain(name);
     }
     expect(native).toEqual(cjs().native);

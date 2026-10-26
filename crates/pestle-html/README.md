@@ -40,7 +40,7 @@ Output values are pestle's compact `Value`; `to_json()` turns one into a
 | `page` | [what any page says of itself](../../docs/page.md) |
 | `structured` | [JSON-LD, microdata, RDFa, microformats](../../docs/structured-data.md) as JSON-LD items and flat events |
 | `aria` | [accessibility snapshots](../../docs/aria.md), as Playwright's `ariaSnapshot()` |
-| `robots`, `sitemap` | [robots.txt and sitemaps](../../docs/crawling.md) |
+| `robots`, `sitemap`, `routes` | [robots.txt, sitemaps and routes](../../docs/crawling.md) |
 | `charset` | the WHATWG encoding sniffing browsers do |
 | `selector`, `tree`, `text` | the selector engine (css-select's semantics), htmlparser2's tree rules, festimap's text |
 

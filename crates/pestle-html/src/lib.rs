@@ -33,6 +33,7 @@ mod number;
 mod out;
 pub mod page;
 pub mod robots;
+pub mod routes;
 pub mod selector;
 pub mod sitemap;
 mod skeleton;

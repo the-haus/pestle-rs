@@ -41,7 +41,7 @@ nothing in a page can make it throw or crash.
 
 Reach for pestle when you're building:
 
-- **Scrapers and crawlers**: listings by CSS selector, links, images, feeds, embedded `__NEXT_DATA__`, bot-wall detection, robots.txt and sitemaps, 6–28× faster than the JavaScript parsers
+- **Scrapers and crawlers**: listings by CSS selector, links, images, feeds, embedded `__NEXT_DATA__`, bot-wall detection, robots.txt, sitemaps and a site's routes (which URLs are its events or products), 6–28× faster than the JavaScript parsers
 - **Structured-data pipelines**: every schema.org item of a page, whatever the format, repaired the way sites mean it, or strictly per the W3C specifications
 - **AI agents that read the web**: an accessibility snapshot with refs to act on, without a browser, with hidden prompt-injection text left out; pages stripped to a model's budget
 - **Large or slow pages**: items handed over as each one closes, while the rest is still downloading
@@ -152,7 +152,7 @@ all of it (`cargo run -p pestle-html --example quickstart`); see also
 | **Page** | title, description, language, canonical, robots, refresh, every meta, alternates, feeds, calendars, icons, pagination, links with text, lazy images, headings, frames, e-mail, phone, embedded script JSON, bot walls | [docs/page.md](docs/page.md) |
 | **Structured data** | JSON-LD, microdata, RDFa (OpenGraph, Dublin Core), microformats2 and classic, as one list of JSON-LD items plus a flat events view; W3C-conformant in strict mode | [docs/structured-data.md](docs/structured-data.md) |
 | **Accessibility** | Playwright's `ariaSnapshot()` in default and `ai` modes, refs with CSS selectors, hidden text filtered | [docs/aria.md](docs/aria.md) |
-| **Crawling** | robots.txt (RFC 9309, Google's leniency), sitemaps (indexes, gzip, text, RSS/Atom), streamed | [docs/crawling.md](docs/crawling.md) |
+| **Crawling** | robots.txt (RFC 9309, Google's leniency), sitemaps (indexes, gzip, text, RSS/Atom), streamed; a site's routes from its URLs (`/agenda/[slug]`, with counts, and which hold its items) | [docs/crawling.md](docs/crawling.md) |
 | **Charsets** | every WHATWG encoding, found as browsers find it, streaming | [docs/page.md#charsets](docs/page.md#charsets) |
 | **For models** | festimap's `cleanForLearn` (a page within a token budget), template fingerprints | [docs/page.md#strip-and-skeleton](docs/page.md#strip-and-skeleton) |
 | **Grammars** (opt-in) | any pest grammar compiled at run time, 3–5× faster than `pest_derive` | [docs/grammars.md](docs/grammars.md) |
@@ -183,7 +183,7 @@ Playwright's ([all numbers](docs/performance.md)).
 | Page pass, charsets, strip and skeleton | [docs/page.md](docs/page.md) |
 | Structured data and spec compliance | [docs/structured-data.md](docs/structured-data.md) |
 | Accessibility snapshots for agents | [docs/aria.md](docs/aria.md) |
-| robots.txt and sitemaps | [docs/crawling.md](docs/crawling.md) |
+| robots.txt, sitemaps and routes | [docs/crawling.md](docs/crawling.md) |
 | pest grammars (opt-in) | [docs/grammars.md](docs/grammars.md) |
 | Performance | [docs/performance.md](docs/performance.md) |
 | Design, parity and testing | [docs/design.md](docs/design.md) |

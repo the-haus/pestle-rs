@@ -815,3 +815,102 @@ pub fn read_sitemap_async(
         options,
     }))
 }
+
+// ── Routes ───────────────────────────────────────────────────────────────
+
+#[napi(object)]
+pub struct NativeRouteOptions {
+    pub min_siblings: Option<u32>,
+    pub max_examples: Option<u32>,
+    pub max_urls: Option<u32>,
+}
+
+/// A page from a sitemap: what it says of the page goes into its route's figures.
+#[napi(object)]
+pub struct NativeRouteEntry {
+    pub url: String,
+    pub lastmod: Option<String>,
+    pub images: Option<bool>,
+}
+
+/// URLs read in batches; routes inferred at [`NativeRouteBuilder::finish`].
+#[napi]
+pub struct NativeRouteBuilder {
+    inner: Option<pestle_html::routes::RouteBuilder>,
+}
+
+#[napi]
+impl NativeRouteBuilder {
+    #[napi(constructor, catch_unwind)]
+    pub fn new(options: Option<NativeRouteOptions>) -> Self {
+        let d = pestle_html::routes::RouteOptions::default();
+        let opts = match options {
+            None => d,
+            Some(o) => pestle_html::routes::RouteOptions {
+                min_siblings: o.min_siblings.map_or(d.min_siblings, |n| n as usize),
+                max_examples: o.max_examples.map_or(d.max_examples, |n| n as usize),
+                max_urls: o.max_urls.map_or(d.max_urls, |n| n as usize),
+                ..d
+            },
+        };
+        NativeRouteBuilder {
+            inner: Some(pestle_html::routes::RouteBuilder::new(opts)),
+        }
+    }
+
+    #[napi(catch_unwind)]
+    pub fn add(&mut self, urls: Vec<String>) -> Result<()> {
+        let b = self.inner.as_mut().ok_or_else(ended)?;
+        for u in &urls {
+            b.add(u);
+        }
+        Ok(())
+    }
+
+    #[napi(catch_unwind)]
+    pub fn add_entries(&mut self, entries: Vec<NativeRouteEntry>) -> Result<()> {
+        let b = self.inner.as_mut().ok_or_else(ended)?;
+        for e in entries {
+            b.add_with(&e.url, e.lastmod, e.images.unwrap_or(false));
+        }
+        Ok(())
+    }
+
+    #[napi(catch_unwind)]
+    pub fn finish(&mut self) -> Result<NativeRoutes> {
+        Ok(NativeRoutes {
+            inner: self.inner.take().ok_or_else(ended)?.finish(),
+        })
+    }
+}
+
+/// A site's routes: the tree, a URL's route, the tree as text.
+#[napi]
+pub struct NativeRoutes {
+    inner: pestle_html::routes::Routes,
+}
+
+#[napi]
+impl NativeRoutes {
+    /// `{ sites, warnings }` as JSON text.
+    #[napi(catch_unwind)]
+    pub fn json(&self) -> Result<String> {
+        serde_json::to_string(&self.inner).map_err(|e| Error::from_reason(e.to_string()))
+    }
+
+    /// `[origin, pattern]` of the route each URL is, or null.
+    #[napi(catch_unwind)]
+    pub fn find_all(&self, urls: Vec<String>) -> Vec<Option<Vec<String>>> {
+        urls.iter()
+            .map(|u| {
+                let (site, route) = self.inner.locate(u)?;
+                Some(vec![site.origin.clone(), route.pattern.clone()])
+            })
+            .collect()
+    }
+
+    #[napi(catch_unwind)]
+    pub fn outline(&self) -> String {
+        self.inner.outline()
+    }
+}

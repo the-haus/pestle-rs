@@ -6,7 +6,7 @@
 
 **Fast streaming HTML extraction for scrapers and AI agents.**
 
-CSS selectors, page metadata, links, embedded JSON, every kind of structured data, accessibility snapshots, robots.txt and sitemaps: read in one pass over the bytes as they arrive, in any charset. Rust under the hood, no DOM.
+CSS selectors, page metadata, links, embedded JSON, every kind of structured data, accessibility snapshots, robots.txt, sitemaps and a site's routes: read in one pass over the bytes as they arrive, in any charset. Rust under the hood, no DOM.
 
 <p>
   <a href="https://www.npmjs.com/package/@pestle-rs/node"><img alt="npm" src="https://img.shields.io/npm/v/@pestle-rs/node?label=npm&logo=npm"></a>
@@ -212,6 +212,26 @@ for (const sitemap of robots.sitemaps) {
 
 robots.txt follows RFC 9309 and reads misspellings the way Google does. Sitemaps stream with a gzip-bomb limit and throw `NotASitemap` on soft 404s. Details: [docs/crawling.md](https://github.com/the-haus/pestle-rs/blob/main/docs/crawling.md).
 
+Which of those pages are the events (or products, or articles)? `inferRoutes` turns the URLs into the site's routes, as Next.js writes them, with counts:
+
+```ts
+import { inferRoutes } from "@pestle-rs/node";
+
+const routes = inferRoutes(pages);    // URLs or sitemap entries
+console.log(routes.outline());
+// https://www.paradiso.nl (4,894 URLs)
+//                         pages   in all
+// /                           1    4,894  root
+// ├── programma               0    3,087  section · event
+// │   ├── [slug]              0    3,086  section · event
+// │   │   └── [id]        3,086    3,086  item · event · 1.00  e.g. /programma/trockener-kecks/2940733
+// …
+routes.items()[0].pattern;            // "/programma/[slug]/[id]": one event a page
+routes.find(link)?.kind;              // "item", "listing", "pagination", "page", …
+```
+
+Details: [docs/crawling.md § Routes](https://github.com/the-haus/pestle-rs/blob/main/docs/crawling.md#routes).
+
 ### Pages for a model's prompt
 
 ```ts
@@ -408,12 +428,13 @@ it("reads the agenda", () => {
 | **`parseRobots(text, token)`** | A `Robots`: `allows(url)`, `allowsAll(urls)`, `rules`, `crawlDelay`, `sitemaps`. `Robots.allowAll()`, `Robots.disallowAll()`. |
 | `parseSitemap(source, options?)` | An async generator of `SitemapEntry`. Options: `url`, `maxBytes`, `maxEntries`, `maxEntryBytes`. |
 | `readSitemap(body, options?)` / `readSitemapAsync` | A whole sitemap: `{ format, entries, gzip, warnings? }`. |
+| **`inferRoutes(urls, options?)`** | A `Routes` from URLs or sitemap entries: `sites` (a tree of `Route`s each), `find(url)`, `findAll(urls)`, `items()`, `outline()`. `new RouteBuilder(options?)` takes them one by one: `add(url \| entry)`, `finish()`. Options: `minSiblings`, `maxExamples`, `maxUrls`. |
 | **`strip(html, options?)`** | `{ html, tokens, truncated }`: festimap's `cleanForLearn`. |
 | `skeleton(html, options?)`, `templateHash(pathsPerPage)` | The template fingerprint. |
 | `charsetOf(contentType)` | `"text/html; charset=ISO-8859-1"` → `"ISO-8859-1"`. |
 | `hasGrammars()` | Whether this build includes pest grammars (`Grammar`, `parse` fields). The published build does not; see [grammars](https://github.com/the-haus/pestle-rs/blob/main/docs/grammars.md). |
 
-Errors: `SpecError` (a spec that does not compile, with `errors[]`), `NotASitemap`, and with grammars `GrammarError` and `ParseError`. Every option and result is typed: `Spec`, `FieldSpec`, `ExtractResult<T>`, `Page`, `Structured`, `StructuredItem`, `StructuredEvent`, `AriaSnapshot`, `SitemapEntry`, and the rest.
+Errors: `SpecError` (a spec that does not compile, with `errors[]`), `NotASitemap`, and with grammars `GrammarError` and `ParseError`. Every option and result is typed: `Spec`, `FieldSpec`, `ExtractResult<T>`, `Page`, `Structured`, `StructuredItem`, `StructuredEvent`, `AriaSnapshot`, `SitemapEntry`, `Route`, and the rest.
 
 ## The spec
 

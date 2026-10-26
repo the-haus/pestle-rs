@@ -93,3 +93,13 @@ export {
   type SitemapEntry,
   type SitemapOptions,
 } from "./crawl.js";
+export {
+  inferRoutes,
+  RouteBuilder,
+  Routes,
+  type Route,
+  type RouteKind,
+  type RouteOptions,
+  type RouteParamType,
+  type RouteSite,
+} from "./routes.js";

@@ -17,6 +17,7 @@ import {
   extractPage,
   extractStructured,
   Extractor,
+  inferRoutes,
   parseRobots,
   readSitemap,
   scrape,
@@ -181,6 +182,15 @@ it("the README cookbook", async () => {
   }
   // readSitemap / robots basics
   assert.equal(readSitemap("<urlset><url><loc>https://a.example/</loc></url></urlset>").entries.length, 1);
+
+  // Routes: which pages are the events.
+  {
+    const urls = ["nora-live", "jazz-night", "open-air-2026"].map((s) => `https://a.example/programma/${s}/${s.length}1`);
+    const routes = inferRoutes(urls);
+    assert.equal(routes.items()[0]!.pattern, "/programma/[slug]/[id]");
+    assert.equal(routes.find("https://a.example/programma/new-show/42")?.kind, "item");
+    assert.match(routes.outline(), /\[id\]\s+3\s+3\s+item · event/);
+  }
   assert.equal(parseRobots("User-agent: *\nDisallow: /", "bot").allows("/x"), false);
   
   

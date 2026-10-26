@@ -198,3 +198,22 @@ export class NativeSitemapReader {
   endJson(): string;
 }
 export function readSitemapAsync(body: string | Uint8Array, url?: string | null, options?: NativeSitemapOptions | null): Promise<string>;
+
+export interface NativeRouteOptions {
+  minSiblings?: number;
+  maxExamples?: number;
+  maxUrls?: number;
+}
+
+export class NativeRouteBuilder {
+  constructor(options?: NativeRouteOptions | null);
+  add(urls: string[]): void;
+  addEntries(entries: { url: string; lastmod?: string; images?: boolean }[]): void;
+  finish(): NativeRoutes;
+}
+
+export class NativeRoutes {
+  json(): string;
+  findAll(urls: string[]): (string[] | null)[];
+  outline(): string;
+}

@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- Added: a site's routes from its URLs, `inferRoutes(urls)` (Node) and `routes::RouteBuilder` (Rust): the tree of
+  patterns its pages follow, as Next.js writes them (`/agenda/[slug]`, `/news/[year]/[month]/[slug]`,
+  `/[locale]/products/[category]/[slug]`), with how many URLs each route is (`pages`) and holds (`total`), its kind
+  (`item`, `listing`, `taxonomy`, `archive`, `pagination`, `page`, `section`), its topic (`event`, `product`,
+  `article`, …), a score for how surely each page is one item, examples, and from sitemap entries the latest
+  `lastmod` and how many pages have images. `items()` lists where a site's events or products are, `find(url)` and
+  `findAll(urls)` say which route a URL is (a page's links, say), and `outline()` prints the tree. Tried on the
+  sitemaps of Paradiso, Melkweg, 013, Lowlands, Allbirds and nu.nl; about 1.5 µs a URL.
+
 ## 0.2.1 — 2026-10-25
 
 Broken JSON-LD and embedded JSON read as meant in more of the ways sites break it, and never at a cost out of

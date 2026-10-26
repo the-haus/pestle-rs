@@ -76,6 +76,8 @@ export const {
   NativeSession,
   NativeShaper,
   NativeRobots,
+  NativeRouteBuilder,
+  NativeRoutes,
   NativeSitemapReader,
   hasGrammars,
   readSitemapAsync,

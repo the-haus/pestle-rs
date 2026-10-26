@@ -129,6 +129,17 @@ export interface NativeSitemapOptions {
   maxEntries?: number
 }
 export declare function readSitemapAsync(body: string | Uint8Array, url?: string | undefined | null, options?: NativeSitemapOptions | undefined | null): Promise<unknown>
+export interface NativeRouteOptions {
+  minSiblings?: number
+  maxExamples?: number
+  maxUrls?: number
+}
+/** A page from a sitemap: what it says of the page goes into its route's figures. */
+export interface NativeRouteEntry {
+  url: string
+  lastmod?: string
+  images?: boolean
+}
 export declare class NativeExtractor {
   /** Throws `SPEC:[errors]` or `GRAMMAR:{name, errors}`. */
   constructor(spec: any, options?: NativeExtractorOptions | undefined | null)
@@ -169,4 +180,19 @@ export declare class NativeSitemapReader {
   endJson(): string
   /** The end: `{ format, entries (the last ones), gzip, warnings }`. */
   end(): unknown
+}
+/** URLs read in batches; routes inferred at [`NativeRouteBuilder::finish`]. */
+export declare class NativeRouteBuilder {
+  constructor(options?: NativeRouteOptions | undefined | null)
+  add(urls: Array<string>): void
+  addEntries(entries: Array<NativeRouteEntry>): void
+  finish(): NativeRoutes
+}
+/** A site's routes: the tree, a URL's route, the tree as text. */
+export declare class NativeRoutes {
+  /** `{ sites, warnings }` as JSON text. */
+  json(): string
+  /** `[origin, pattern]` of the route each URL is, or null. */
+  findAll(urls: Array<string>): Array<Array<string> | undefined | null>
+  outline(): string
 }
