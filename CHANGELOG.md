@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.5.0 — 2026-11-03
+
+A page's lead image, by what festimap's site crawler asked for: the signals a browser preloads it by.
 
 - Added: a page's lead image, by the signals a browser preloads it by. `page.preloads`: every `<link rel="preload">`
   (and `rel="prefetch"` with an `as`) as `{ href, as, type?, srcset? }`, `as` lowercase, `srcset` the largest
