@@ -1,8 +1,9 @@
 //! What a scraper wants to know of any page, read in the same pass: title,
 //! description, language, canonical URL, robots rules, a meta refresh,
 //! every `<meta>` (OpenGraph, Twitter cards, `name=` and `property=`
-//! alike), alternates by language, feeds and calendars, icons, pagination,
-//! the links with their text, the images (lazy-loaded ones too), headings,
+//! alike), alternates by language, feeds and calendars, icons, preloads and
+//! `image_src`, pagination, the links with their text, the images (lazy-loaded
+//! ones too, with their `fetchpriority`), headings,
 //! embedded frames, e-mail addresses and phone numbers, and the JSON pages
 //! carry for their scripts (`__NEXT_DATA__`, `<script type="application/json">`,
 //! `window.__INITIAL_STATE__ = {…}`), and on request the page's visible
@@ -119,6 +120,22 @@ pub struct Icon {
     pub kind: Option<String>,
 }
 
+/// `<link rel="preload">` (or `rel="prefetch"` with an `as`): what the page asks the browser to
+/// fetch early, its lead image among them.
+#[derive(Clone, Debug, Default, Serialize)]
+pub struct Preload {
+    /// `href`, else `imagesrcset`'s largest candidate.
+    pub href: String,
+    /// `as`, lowercase: `image`, `font`, `script`, `style`, `fetch` …
+    #[serde(rename = "as")]
+    pub kind: String,
+    #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
+    pub mime: Option<String>,
+    /// `imagesrcset`'s largest candidate.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub srcset: Option<String>,
+}
+
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct Link {
     pub href: String,
@@ -140,6 +157,12 @@ pub struct Image {
     pub width: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub height: Option<u32>,
+    /// `fetchpriority` as stated: `high`, `low` or `auto`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fetchpriority: Option<String>,
+    /// `loading` as stated: `eager` or `lazy`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub loading: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -193,6 +216,12 @@ pub struct Page {
     pub icons: Vec<Icon>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub manifest: Option<String>,
+    /// `<link rel="preload">`, and `rel="prefetch"` with an `as`.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub preloads: Vec<Preload>,
+    /// `<link rel="image_src">`: the page's picture, as pages stated it before OpenGraph.
+    #[serde(rename = "imageSrc", skip_serializing_if = "Option::is_none")]
+    pub image_src: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub next: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -459,13 +488,18 @@ impl PagePass {
     }
 
     fn open_link_tag(&mut self, attr: &dyn Fn(&str) -> Option<String>) {
-        let (Some(rel), Some(href)) = (attr("rel"), attr("href")) else {
-            return;
-        };
+        let Some(rel) = attr("rel") else { return };
         let rels: Vec<String> = rel.split_ascii_whitespace().map(|r| r.to_ascii_lowercase()).collect();
-        let kind = attr("type").map(|t| t.trim().to_ascii_lowercase());
-        let Some(url) = self.absolute(&href) else { return };
         let has = |r: &str| rels.iter().any(|x| x == r);
+        let kind = attr("type").map(|t| t.trim().to_ascii_lowercase());
+        if has("preload") || has("prefetch") {
+            self.preload(attr, kind.clone().filter(|t| !t.is_empty()));
+        }
+        let Some(href) = attr("href") else { return };
+        let Some(url) = self.absolute(&href) else { return };
+        if has("image_src") && self.page.image_src.is_none() {
+            self.page.image_src = self.http(&href);
+        }
         if has("canonical") && self.page.canonical.is_none() {
             self.page.canonical = Some(url.clone());
         }
@@ -516,6 +550,30 @@ impl PagePass {
             if list.len() < 500 && !list.iter().any(|a| a.href == alt.href && a.hreflang == alt.hreflang) {
                 list.push(alt);
             }
+        }
+    }
+
+    /// `<link rel="preload" as href|imagesrcset>`; one without an `as` fetches nothing in particular.
+    fn preload(&mut self, attr: &dyn Fn(&str) -> Option<String>, mime: Option<String>) {
+        let Some(kind) = attr("as")
+            .map(|a| a.trim().to_ascii_lowercase())
+            .filter(|a| !a.is_empty())
+        else {
+            return;
+        };
+        let srcset = attr("imagesrcset")
+            .and_then(|s| largest(&s))
+            .and_then(|s| self.absolute(&s));
+        let Some(href) = attr("href").and_then(|h| self.absolute(&h)).or_else(|| srcset.clone()) else {
+            return;
+        };
+        if self.page.preloads.len() < 100 && !self.page.preloads.iter().any(|p| p.href == href && p.kind == kind) {
+            self.page.preloads.push(Preload {
+                href,
+                kind,
+                mime,
+                srcset,
+            });
         }
     }
 
@@ -629,6 +687,8 @@ impl PagePass {
             alt,
             width: dim("width"),
             height: dim("height"),
+            fetchpriority: stated(attr("fetchpriority"), &["high", "low", "auto"]),
+            loading: stated(attr("loading"), &["eager", "lazy"]),
         });
     }
 
@@ -900,6 +960,12 @@ fn is_ics(href: &str) -> bool {
     let h = href.trim().to_ascii_lowercase();
     let path = h.split(['?', '#']).next().unwrap_or("");
     path.ends_with(".ics") || h.contains("?ical=") || h.contains("&ical=") || h.contains("?ics=") || h.contains("&ics=")
+}
+
+/// An enumerated attribute's value, lowercase, when it is one of `values`.
+fn stated(value: Option<String>, values: &[&str]) -> Option<String> {
+    let v = value?.trim().to_ascii_lowercase();
+    values.contains(&v.as_str()).then_some(v)
 }
 
 fn is_empty_json(v: &Value) -> bool {

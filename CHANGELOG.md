@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Added: a page's lead image, by the signals a browser preloads it by. `page.preloads`: every `<link rel="preload">`
+  (and `rel="prefetch"` with an `as`) as `{ href, as, type?, srcset? }`, `as` lowercase, `srcset` the largest
+  candidate of `imagesrcset` (and `href` that candidate when the link has none); `page.imageSrc`: `<link
+  rel="image_src">`; on each `page.images` entry `fetchpriority` (`high`, `low`, `auto`) and `loading` (`eager`,
+  `lazy`) as stated. Absolute against `<base href>`; head links, so kept with `images: false`.
+
 ## 0.4.0 — 2026-10-26
 
 What festimap's site crawler still did around pestle: fields matched in the page's context, values read from above a

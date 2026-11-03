@@ -21,11 +21,16 @@ const { page, structured } = await scrape(await fetch(url)); // the page and its
 | `meta` | every `<meta>` by its `name`, `property`, `itemprop` or `http-equiv`, lowercase: OpenGraph (also when written with `name=`), Twitter cards, everything |
 | `alternates`, `feeds`, `calendars`, `icons` | `hreflang` versions; RSS/Atom/JSON feeds; `text/calendar`, `webcal:` and `.ics` links; favicons |
 | `links` | every `<a href>` once, http(s), absolute, without `#…`, with its text (else its `title`, `aria-label` or an image's `alt`), `rel` and `nofollow` |
-| `images` | every `<img>` once, lazy-loaded ones by their real address (`data-src`, `data-lazy-src`, `srcset`'s largest), with `alt`, `width`, `height` |
+| `preloads`, `imageSrc` | `<link rel="preload">` (and `rel="prefetch"` with an `as`): `{ href, as, type, srcset }`, `srcset` being `imagesrcset`'s largest candidate; `<link rel="image_src">`. Head links, kept with `images: false` |
+| `images` | every `<img>` once, lazy-loaded ones by their real address (`data-src`, `data-lazy-src`, `srcset`'s largest), with `alt`, `width`, `height`, and `fetchpriority` and `loading` as stated |
 | `headings`, `frames`, `emails`, `phones` | `h1`–`h6`; `<iframe>` (maps, videos, ticket shops); `mailto:` and `tel:` links |
 | `embedded` | the JSON pages keep for their scripts: `__NEXT_DATA__`, `__NUXT_DATA__`, `<script type="application/json">`, `window.__INITIAL_STATE__ = {…}`, `… = JSON.parse('…')` |
 | `blocked` | a bot wall instead of the page: Cloudflare, DataDome, PerimeterX, Imperva/Incapsula, Akamai, captchas |
 | `charset` | the encoding it was read in |
+
+A page's lead picture, when it states no `og:image`, is most often the
+preloaded image (`preloads` with `as: "image"`), else `imageSrc`, else the
+`<img fetchpriority="high">`.
 
 Everything is absolute (against `<base href>`), deduplicated, capped
 (`warnings` says what was cut) and cleaned (whitespace collapsed, soft

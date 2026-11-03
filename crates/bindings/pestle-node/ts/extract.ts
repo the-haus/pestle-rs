@@ -374,13 +374,30 @@ export interface Page {
   calendars?: string[];
   icons?: { href: string; rel: string; sizes?: string; type?: string }[];
   manifest?: string;
+  /**
+   * `<link rel="preload">`, and `rel="prefetch"` with an `as`: what the page has the browser fetch early,
+   * its lead (LCP) image among them. `href` is the link's, else `imagesrcset`'s largest candidate; `as`
+   * lowercase; `srcset` is `imagesrcset`'s largest candidate.
+   */
+  preloads?: { href: string; as: string; type?: string; srcset?: string }[];
+  /** `<link rel="image_src">`: the page's picture, as pages named it before OpenGraph. */
+  imageSrc?: string;
   /** Pagination: `rel="next"`/`"prev"` on `<link>` or `<a>`. */
   next?: string;
   prev?: string;
   /** `<a href>` once each, with its text (or its `title`, `aria-label`, an image's `alt`). */
   links?: { href: string; text: string; rel?: string[]; nofollow?: boolean }[];
   /** `<img>`, lazy-loaded ones by their real address (`data-src`, `srcset`'s largest). */
-  images?: { src: string; alt?: string; width?: number; height?: number }[];
+  images?: {
+    src: string;
+    alt?: string;
+    width?: number;
+    height?: number;
+    /** `fetchpriority` as stated: the page's lead image is often the one marked `high`. */
+    fetchpriority?: "high" | "low" | "auto";
+    /** `loading` as stated. */
+    loading?: "eager" | "lazy";
+  }[];
   headings?: { level: number; text: string }[];
   /** `<iframe src>`: maps, videos, ticket shops. */
   frames?: string[];

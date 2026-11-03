@@ -31,6 +31,26 @@ describe("page", () => {
     expect(p.meta["og:image"]).toBe("/og.jpg");
   });
 
+  it("reads the lead image a browser preloads", () => {
+    const html =
+      '<link rel="preload" as="image" href="/hero.jpg" imagesrcset="/hero-800.jpg 800w, /hero-1600.jpg 1600w">' +
+      '<link rel="image_src" href="/share.jpg"><img src="/a.jpg"><img fetchpriority="high" src="/b.jpg" width="1600">';
+    const p = new Extractor({}, { page: { images: true } }).extract(html, { url: "https://x.nl/" }).page!;
+    expect(p.preloads).toEqual([{ href: "https://x.nl/hero.jpg", as: "image", srcset: "https://x.nl/hero-1600.jpg" }]);
+    expect(p.imageSrc).toBe("https://x.nl/share.jpg");
+    expect(p.images![1].fetchpriority).toBe("high");
+    expect(p.images![0]).not.toHaveProperty("fetchpriority");
+
+    const none = extractPage('<img src="/a.jpg">', { url: "https://x.nl/" });
+    expect(none).not.toHaveProperty("preloads");
+    expect(none).not.toHaveProperty("imageSrc");
+
+    const noImages = new Extractor({}, { page: { images: false } }).extract(html, { url: "https://x.nl/" }).page!;
+    expect(noImages.images).toBeUndefined();
+    expect(noImages.preloads).toHaveLength(1);
+    expect(noImages.imageSrc).toBe("https://x.nl/share.jpg");
+  });
+
   it("reads bytes in their charset; strings as they are", async () => {
     // windows-1252 bytes: by the server's word, by the page's, by the bytes themselves.
     const bytes = latin1(PAGE.replace("—", "-"));

@@ -427,3 +427,55 @@ fn the_pages_text_a_line_per_block() {
         p.warnings
     );
 }
+
+#[test]
+fn the_lead_image_a_browser_preloads() {
+    let html = r#"<head><base href="https://x.nl/">
+        <link rel="preload" as="image" href="/hero.jpg" imagesrcset="/hero-800.jpg 800w, /hero-1600.jpg 1600w">
+        <link rel="preload" as="IMAGE" imagesrcset="only-a.jpg 1x, only-b.jpg 2x">
+        <link rel="preload" href="/no-as.js">
+        <link rel="prefetch" as="font" type="Font/WOFF2" href="/f.woff2">
+        <link rel="image_src" href="/share.jpg"><link rel="image_src" href="/second.jpg"></head>
+        <body><img src="/a.jpg" loading="LAZY"><img fetchpriority="high" src="/b.jpg" width="1600">
+        <img src="/c.jpg" fetchpriority="urgent" loading="soon"></body>"#;
+    let p = page(html);
+    let v = serde_json::to_value(&p).unwrap();
+    assert_eq!(
+        v["preloads"],
+        json!([
+            { "href": "https://x.nl/hero.jpg", "as": "image", "srcset": "https://x.nl/hero-1600.jpg" },
+            { "href": "https://x.nl/only-b.jpg", "as": "image", "srcset": "https://x.nl/only-b.jpg" },
+            { "href": "https://x.nl/f.woff2", "as": "font", "type": "font/woff2" },
+        ])
+    );
+    assert_eq!(v["imageSrc"], "https://x.nl/share.jpg");
+    assert_eq!(v["images"][0]["loading"], "lazy");
+    assert!(v["images"][0].get("fetchpriority").is_none());
+    assert_eq!(v["images"][1]["fetchpriority"], "high");
+    assert!(v["images"][2].get("fetchpriority").is_none() && v["images"][2].get("loading").is_none());
+
+    // None of the keys on a page without them.
+    let v = serde_json::to_value(page(r#"<link rel="icon" href="/f.ico"><img src="/a.jpg">"#)).unwrap();
+    for k in ["preloads", "imageSrc"] {
+        assert!(v.get(k).is_none(), "{k}");
+    }
+    assert!(v["images"][0].get("fetchpriority").is_none() && v["images"][0].get("loading").is_none());
+
+    // `images: false` drops the images, not the head's links.
+    let x = Extractor::new(
+        &json!({}),
+        &Default::default(),
+        ExtractorOptions {
+            page: Some(PageOptions {
+                images: false,
+                ..PageOptions::default()
+            }),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    let p = x.extract(html.as_bytes(), None).page.unwrap();
+    assert!(p.images.is_empty());
+    assert_eq!(p.preloads.len(), 3);
+    assert_eq!(p.image_src.as_deref(), Some("https://x.nl/share.jpg"));
+}

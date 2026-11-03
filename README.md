@@ -149,7 +149,7 @@ all of it (`cargo run -p pestle-html --example quickstart`); see also
 | | | |
 | --- | --- | --- |
 | **Spec fields** | CSS selectors → text (or text as lines), attributes, HTML, URLs, numbers, JSON, regexes; nested objects; values stated once above the rows (`closest`); items emitted as they close | [docs/spec.md](docs/spec.md) |
-| **Page** | title, description, language, canonical, robots, refresh, every meta, alternates, feeds, calendars, icons, pagination, links with text, lazy images, headings, frames, e-mail, phone, embedded script JSON, bot walls | [docs/page.md](docs/page.md) |
+| **Page** | title, description, language, canonical, robots, refresh, every meta, alternates, feeds, calendars, icons, preloads and `image_src`, pagination, links with text, lazy images (with `fetchpriority`), headings, frames, e-mail, phone, embedded script JSON, bot walls | [docs/page.md](docs/page.md) |
 | **Structured data** | JSON-LD, microdata, RDFa (OpenGraph, Dublin Core), microformats2 and classic, as one list of JSON-LD items plus a flat events view; W3C-conformant in strict mode | [docs/structured-data.md](docs/structured-data.md) |
 | **Accessibility** | Playwright's `ariaSnapshot()` in default and `ai` modes, refs with CSS selectors, hidden text filtered | [docs/aria.md](docs/aria.md) |
 | **Crawling** | robots.txt (RFC 9309, Google's leniency), sitemaps (indexes, gzip, text, RSS/Atom), streamed; a site's routes from its URLs (`/agenda/[slug]`, with counts, and which hold its items); registrable domains by the Public Suffix List | [docs/crawling.md](docs/crawling.md) |
